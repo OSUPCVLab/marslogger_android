@@ -285,15 +285,15 @@ public class Camera2Proxy {
                     CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
 
             // fix focus distance
-            mPreviewRequestBuilder.set(
-                    CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-            Float minFocusDistance = mCameraCharacteristics.get(
-                    CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
-            if (minFocusDistance == null)
-                minFocusDistance = 5.0f;
-            mPreviewRequestBuilder.set(
-                    CaptureRequest.LENS_FOCUS_DISTANCE, minFocusDistance);
-            Log.d(TAG, "Focus distance set to its min value:" + minFocusDistance);
+//            mPreviewRequestBuilder.set(
+//                    CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+//            Float minFocusDistance = mCameraCharacteristics.get(
+//                    CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+//            if (minFocusDistance == null)
+//                minFocusDistance = 5.0f;
+//            mPreviewRequestBuilder.set(
+//                    CaptureRequest.LENS_FOCUS_DISTANCE, minFocusDistance);
+//            Log.d(TAG, "Focus distance set to its min value:" + minFocusDistance);
 
             if (mPreviewSurfaceTexture != null && mPreviewSurface == null) { // use texture view
                 mPreviewSurfaceTexture.setDefaultBufferSize(mPreviewSize.getWidth(),
