@@ -29,6 +29,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import timber.log.Timber;
+
 /**
  * Camera-related utility functions.
  */
@@ -197,14 +199,14 @@ public class CameraUtils {
                         entries[i] = cameraId + " - Lens External";
                     }
                 } catch (NullPointerException e) {
-                    e.printStackTrace();
+                    Timber.e(e);
                     entries[i] = cameraId + " - Lens Facing Unknown";
                 }
                 // Set the value to just the camera id
                 entriesValues[i] = cameraId;
             }
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
         return rearCameraId;
     }

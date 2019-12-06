@@ -29,6 +29,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
+import timber.log.Timber;
+
 /**
  * This class wraps up the core components used for surface-input video encoding.
  * <p>
@@ -99,7 +101,7 @@ public class VideoEncoderCore {
             mFrameMetadataWriter = new BufferedWriter(
                     new FileWriter(metaFile, false));
         } catch (IOException err) {
-            System.err.println("IOException in opening frameMetadataWriter: " + err.getMessage());
+            Timber.e(err, "IOException in opening frameMetadataWriter.");
         }
         mTimeArray = new ArrayList<>();
     }
@@ -137,7 +139,7 @@ public class VideoEncoderCore {
                 mFrameMetadataWriter.flush();
                 mFrameMetadataWriter.close();
             } catch (IOException err) {
-                System.err.println("IOException in closing frameMetadataWriter: " + err.getMessage());
+                Timber.e(err, "IOException in closing frameMetadataWriter.");
             }
             mFrameMetadataWriter = null;
         }

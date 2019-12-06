@@ -54,6 +54,7 @@ import javax.microedition.khronos.opengles.GL10;
 
 import edu.osu.pcv.marslogger.gles.FullFrameRect;
 import edu.osu.pcv.marslogger.gles.Texture2dProgram;
+import timber.log.Timber;
 
 /**
  * Shows the camera preview on screen while simultaneously recording it to a .mp4 file.
@@ -190,6 +191,11 @@ public class CameraCaptureActivity extends Activity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (BuildConfig.DEBUG) {
+            Timber.plant(new Timber.DebugTree());
+        }
+
         setContentView(R.layout.activity_camera_capture);
 
         Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
@@ -224,7 +230,6 @@ public class CameraCaptureActivity extends Activity
 
         mImuManager = new IMUManager(this);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
-        Log.d(TAG, "onCreate complete: " + this);
     }
 
     // updates mCameraPreviewWidth/Height
@@ -244,9 +249,9 @@ public class CameraCaptureActivity extends Activity
 
     @Override
     protected void onResume() {
-        Log.d(TAG, "onResume -- acquiring camera");
+        Timber.d("onResume -- acquiring camera");
         super.onResume();
-        Log.d(TAG, "Keeping screen on for previewing recording.");
+        Timber.d("Keeping screen on for previewing recording.");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         updateControls();
 

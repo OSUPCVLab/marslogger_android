@@ -38,6 +38,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import timber.log.Timber;
+
 public class Camera2Proxy {
 
     private static final String TAG = "Camera2Proxy";
@@ -77,20 +79,20 @@ public class Camera2Proxy {
     private CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
-            Log.d(TAG, "onOpened");
+            Timber.d("onOpened");
             mCameraDevice = camera;
             initPreviewRequest();
         }
 
         @Override
         public void onDisconnected(@NonNull CameraDevice camera) {
-            Log.d(TAG, "onDisconnected");
+            Timber.d("onDisconnected");
             releaseCamera();
         }
 
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
-            Log.e(TAG, "Camera Open failed, error: " + error);
+            Timber.w("Camera Open failed with error %d", error);
             releaseCamera();
         }
     };
@@ -107,8 +109,8 @@ public class Camera2Proxy {
             mFrameMetadataWriter.write(header + "\n");
             mRecordingMetadata = true;
         } catch (IOException err) {
-            System.err.println("IOException in opening frameMetadataWriter at "
-                    + captureResultFile + ":" + err.getMessage());
+            Timber.e(err, "IOException in opening frameMetadataWriter at %s",
+                    captureResultFile);
         }
     }
 
@@ -119,8 +121,7 @@ public class Camera2Proxy {
                 mFrameMetadataWriter.flush();
                 mFrameMetadataWriter.close();
             } catch (IOException err) {
-                System.err.println("IOException in closing frameMetadataWriter: " +
-                        err.getMessage());
+                Timber.e(err, "IOException in closing frameMetadataWriter.");
             }
             mFrameMetadataWriter = null;
         }
@@ -155,18 +156,18 @@ public class Camera2Proxy {
 
             mPreviewSize = CameraUtils.chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
                     width, height, mVideoSize);
-            Log.d(TAG, "Video size " + mVideoSize.toString() +
-                    " preview size " + mPreviewSize.toString());
+            Timber.d("Video size %s preview size %s.",
+                    mVideoSize.toString(), mPreviewSize.toString());
 
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
         return mPreviewSize;
     }
 
     @SuppressLint("MissingPermission")
     public void openCamera(int width, int height) {
-        Log.v(TAG, "openCamera");
+        Timber.v("openCamera");
         startBackgroundThread();
         mOrientationEventListener.enable();
         if (mCameraIdStr.isEmpty()) {
@@ -175,12 +176,12 @@ public class Camera2Proxy {
         try {
             mCameraManager.openCamera(mCameraIdStr, mStateCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
     }
 
     public void releaseCamera() {
-        Log.v(TAG, "releaseCamera");
+        Timber.v("releaseCamera");
         if (null != mCaptureSession) {
             mCaptureSession.close();
             mCaptureSession = null;
@@ -203,7 +204,7 @@ public class Camera2Proxy {
     public void setImageAvailableListener(ImageReader.OnImageAvailableListener
                                                   onImageAvailableListener) {
         if (mImageReader == null) {
-            Log.w(TAG, "setImageAvailableListener: mImageReader is null");
+            Timber.w("setImageAvailableListener: mImageReader is null");
             return;
         }
         mImageReader.setOnImageAvailableListener(onImageAvailableListener, null);
@@ -256,22 +257,22 @@ public class Camera2Proxy {
         Range<Long> exposureTimeRange = mCameraCharacteristics.get(
                 CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
         if (exposureTimeRange != null) {
-            Log.d(TAG, "exposure time range " + exposureTimeRange.toString());
+            Timber.d("exposure time range %s", exposureTimeRange.toString());
         }
 
         mPreviewRequestBuilder.set(
                 CaptureRequest.SENSOR_EXPOSURE_TIME, exposureNanos);
-        Log.d(TAG, "Exposure time set to " + exposureNanos);
+        Timber.d("Exposure time set to %d", exposureNanos);
 
         // fix ISO
         Range<Integer> isoRange = mCameraCharacteristics.get(
                 CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
         if (isoRange != null) {
-            Log.d(TAG, "ISO range " + isoRange.toString());
+            Timber.d("ISO range %s", isoRange.toString());
         }
 
         mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, desiredIso);
-        Log.d(TAG, "ISO set to " + desiredIso);
+        Timber.d("ISO set to %d", desiredIso);
     }
 
     private void initPreviewRequest() {
@@ -293,7 +294,7 @@ public class Camera2Proxy {
 //                minFocusDistance = 5.0f;
 //            mPreviewRequestBuilder.set(
 //                    CaptureRequest.LENS_FOCUS_DISTANCE, minFocusDistance);
-//            Log.d(TAG, "Focus distance set to its min value:" + minFocusDistance);
+//            Timber.d("Focus distance set to its min value %f", minFocusDistance);
 
             if (mPreviewSurfaceTexture != null && mPreviewSurface == null) { // use texture view
                 mPreviewSurfaceTexture.setDefaultBufferSize(mPreviewSize.getWidth(),
@@ -313,11 +314,11 @@ public class Camera2Proxy {
 
                         @Override
                         public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-                            Log.e(TAG, "ConfigureFailed. session: mCaptureSession");
+                            Timber.w("ConfigureFailed. session: mCaptureSession");
                         }
                     }, mBackgroundHandler);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
     }
 
@@ -370,7 +371,7 @@ public class Camera2Proxy {
                         try {
                             mFrameMetadataWriter.write(frame_info + "\n");
                         } catch (IOException err) {
-                            System.err.println("Error writing captureResult: " + err.getMessage());
+                            Timber.e(err, "Error writing captureResult");
                         }
                     }
                     ((CameraCaptureActivity) mActivity).updateCaptureResultPanel(
@@ -380,35 +381,34 @@ public class Camera2Proxy {
                 @Override
                 public void onCaptureProgressed(CameraCaptureSession session, CaptureRequest request,
                                                 CaptureResult partialResult) {
-//                    Log.d(TAG, "mSessionCaptureCallback,  onCaptureProgressed");
                 }
             };
 
 
     public void startPreview() {
-        Log.v(TAG, "startPreview");
+        Timber.v("startPreview");
         if (mCaptureSession == null || mPreviewRequestBuilder == null) {
-            Log.w(TAG, "startPreview: mCaptureSession or mPreviewRequestBuilder is null");
+            Timber.w("startPreview: mCaptureSession or mPreviewRequestBuilder is null");
             return;
         }
         try {
             mCaptureSession.setRepeatingRequest(
                     mPreviewRequest, mSessionCaptureCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
     }
 
     public void stopPreview() {
-        Log.v(TAG, "stopPreview");
+        Timber.v("stopPreview");
         if (mCaptureSession == null || mPreviewRequestBuilder == null) {
-            Log.w(TAG, "stopPreview: mCaptureSession or mPreviewRequestBuilder is null");
+            Timber.w("stopPreview: mCaptureSession or mPreviewRequestBuilder is null");
             return;
         }
         try {
             mCaptureSession.stopRepeating();
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
     }
 
@@ -428,7 +428,7 @@ public class Camera2Proxy {
             mCaptureSession.setRepeatingRequest(
                     mPreviewRequestBuilder.build(), null, null);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
 
         setExposureAndIso();
@@ -445,13 +445,13 @@ public class Camera2Proxy {
                     mPreviewRequestBuilder.build(),
                     mSessionCaptureCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
     }
 
     private void startBackgroundThread() {
         if (mBackgroundThread == null || mBackgroundHandler == null) {
-            Log.v(TAG, "startBackgroundThread");
+            Timber.v("startBackgroundThread");
             mBackgroundThread = new HandlerThread("CameraBackground");
             mBackgroundThread.start();
             mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
@@ -459,7 +459,7 @@ public class Camera2Proxy {
     }
 
     private void stopBackgroundThread() {
-        Log.v(TAG, "stopBackgroundThread");
+        Timber.v("stopBackgroundThread");
         try {
             if (mBackgroundThread != null) {
                 mBackgroundThread.quitSafely();
@@ -468,7 +468,7 @@ public class Camera2Proxy {
             mBackgroundThread = null;
             mBackgroundHandler = null;
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Timber.e(e);
         }
     }
 }
