@@ -150,4 +150,8 @@
     <string name="title_scheduled_swap">Scheduled swap</string>
     <string name="title_texture_from_camera">Texture from camera</string>
 
+    <string name="eula_title">END-USER LICENSE AGREEMENT FOR MarsLogger</string>
+    <string name="eula_accept">Accept</string>
+    <string name="eula_refuse">Decline</string>
+
 </resources>

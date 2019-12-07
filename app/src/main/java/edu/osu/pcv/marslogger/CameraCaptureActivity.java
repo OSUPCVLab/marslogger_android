@@ -198,6 +198,8 @@ public class CameraCaptureActivity extends Activity
 
         setContentView(R.layout.activity_camera_capture);
 
+        Eula.show(this);
+
         Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
                 R.array.cameraFilterNames, android.R.layout.simple_spinner_item);
