@@ -242,13 +242,15 @@ public class Camera2Proxy {
             int index = expoStats.size() / 2;
             Long actualExpo = expoStats.get(index).mExposureNanos;
             Integer actualIso = expoStats.get(index).mIso;
-            if (actualExpo <= exposureNanos) {
-                exposureNanos = actualExpo;
-                desiredIso = actualIso;
-            } else {
-                desiredIsoL = actualIso * actualExpo / exposureNanos;
-                desiredIso = desiredIsoL.intValue();
-            }
+            if (actualExpo != null && actualIso != null) {
+                if (actualExpo <= exposureNanos) {
+                    exposureNanos = actualExpo;
+                    desiredIso = actualIso;
+                } else {
+                    desiredIsoL = actualIso * actualExpo / exposureNanos;
+                    desiredIso = desiredIsoL.intValue();
+                }
+            } // else may occur on an emulated device.
         }
 
         // fix exposure
