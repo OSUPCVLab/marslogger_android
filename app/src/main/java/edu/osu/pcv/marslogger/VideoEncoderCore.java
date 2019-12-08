@@ -76,7 +76,7 @@ public class VideoEncoderCore {
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitRate);
         format.setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE);
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, IFRAME_INTERVAL);
-        if (VERBOSE) Log.d(TAG, "format: " + format);
+        if (VERBOSE) Timber.d("format: %s", format.toString());
 
         // Create a MediaCodec encoder, and configure it with our format.  Get a Surface
         // we can use for input and wrap it with a class that handles the EGL work.
@@ -117,7 +117,7 @@ public class VideoEncoderCore {
      * Releases encoder resources.
      */
     public void release() {
-        if (VERBOSE) Log.d(TAG, "releasing encoder objects");
+        if (VERBOSE) Timber.d("releasing encoder objects");
         if (mEncoder != null) {
             mEncoder.stop();
             mEncoder.release();
@@ -157,10 +157,10 @@ public class VideoEncoderCore {
      */
     public void drainEncoder(boolean endOfStream) {
         final int TIMEOUT_USEC = 10000;
-        if (VERBOSE) Log.d(TAG, "drainEncoder(" + endOfStream + ")");
+        if (VERBOSE) Timber.d("drainEncoder(%b)", endOfStream);
 
         if (endOfStream) {
-            if (VERBOSE) Log.d(TAG, "sending EOS to encoder");
+            if (VERBOSE) Timber.d("sending EOS to encoder");
             mEncoder.signalEndOfInputStream();
         }
 
@@ -172,7 +172,7 @@ public class VideoEncoderCore {
                 if (!endOfStream) {
                     break;      // out of while
                 } else {
-                    if (VERBOSE) Log.d(TAG, "no output available, spinning to await EOS");
+                    if (VERBOSE) Timber.d("no output available, spinning to await EOS");
                 }
             } else if (encoderStatus == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
                 // not expected for an encoder
@@ -183,15 +183,14 @@ public class VideoEncoderCore {
                     throw new RuntimeException("format changed twice");
                 }
                 MediaFormat newFormat = mEncoder.getOutputFormat();
-                Log.d(TAG, "encoder output format changed: " + newFormat);
+                Timber.d("encoder output format changed: %s", newFormat.toString());
 
                 // now that we have the Magic Goodies, start the muxer
                 mTrackIndex = mMuxer.addTrack(newFormat);
                 mMuxer.start();
                 mMuxerStarted = true;
             } else if (encoderStatus < 0) {
-                Log.w(TAG, "unexpected result from encoder.dequeueOutputBuffer: " +
-                        encoderStatus);
+                Timber.w("unexpected result from encoder.dequeueOutputBuffer: %d", encoderStatus);
                 // let's ignore it
             } else {
                 ByteBuffer encodedData = encoderOutputBuffers[encoderStatus];
@@ -203,7 +202,7 @@ public class VideoEncoderCore {
                 if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     // The codec config data was pulled out and fed to the muxer when we got
                     // the INFO_OUTPUT_FORMAT_CHANGED status.  Ignore it.
-                    if (VERBOSE) Log.d(TAG, "ignoring BUFFER_FLAG_CODEC_CONFIG");
+                    if (VERBOSE) Timber.d("ignoring BUFFER_FLAG_CODEC_CONFIG");
                     mBufferInfo.size = 0;
                 }
 
@@ -218,8 +217,8 @@ public class VideoEncoderCore {
                     mTimeArray.add(mBufferInfo.presentationTimeUs);
                     mMuxer.writeSampleData(mTrackIndex, encodedData, mBufferInfo);
                     if (VERBOSE) {
-                        Log.d(TAG, "sent " + mBufferInfo.size + " bytes to muxer, ts=" +
-                                mBufferInfo.presentationTimeUs);
+                        Timber.d("sent %d bytes to muxer, ts=%d",
+                                mBufferInfo.size, mBufferInfo.presentationTimeUs);
                     }
                 }
 
@@ -227,9 +226,9 @@ public class VideoEncoderCore {
 
                 if ((mBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     if (!endOfStream) {
-                        Log.w(TAG, "reached end of stream unexpectedly");
+                        Timber.w("reached end of stream unexpectedly");
                     } else {
-                        if (VERBOSE) Log.d(TAG, "end of stream reached");
+                        if (VERBOSE) Timber.d("end of stream reached");
                     }
                     break;      // out of while
                 }

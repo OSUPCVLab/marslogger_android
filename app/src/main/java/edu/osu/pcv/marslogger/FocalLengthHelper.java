@@ -10,12 +10,13 @@ import android.util.Log;
 import android.util.Size;
 import android.util.SizeF;
 
+import timber.log.Timber;
+
 public class FocalLengthHelper {
 
     private static final String TAG = "FocalLengthHelper";
 
     private float[] mIntrinsic;
-    private float[] mDistortion;
     private Float mFocalLength;
     private Float mFocusDistance;
     private SizeF mPhysicalSize;
@@ -60,7 +61,7 @@ public class FocalLengthHelper {
     // https://stackoverflow.com/questions/39965408/what-is-the-android-camera2-api-equivalent-of-camera-parameters-gethorizontalvie
     public SizeF getFocalLengthPixel() {
         if (mIntrinsic != null && mIntrinsic[0] > 1.0) {
-            Log.d(TAG, "Focal length set as (" + mIntrinsic[0] + ", " + mIntrinsic[1]);
+            Timber.d("Focal length set as (%f, %f)",mIntrinsic[0], mIntrinsic[1]);
             return new SizeF(mIntrinsic[0], mIntrinsic[1]);
         }
 
@@ -95,35 +96,24 @@ public class FocalLengthHelper {
     private void setLensParams23(CameraCharacteristics result) {
         mIntrinsic = result.get(CameraCharacteristics.LENS_INTRINSIC_CALIBRATION);
         if (mIntrinsic != null)
-            Log.d(TAG, "char lens intrinsics fx " + mIntrinsic[0] +
-                    " fy " + mIntrinsic[1] +
-                    " cx " + mIntrinsic[2] +
-                    " cy " + mIntrinsic[3] +
-                    " s " + mIntrinsic[4]);
-        float[] mDistortion = result.get(CameraCharacteristics.LENS_RADIAL_DISTORTION);
-        if (mDistortion != null)
-            Log.d(TAG, "char lens distortion k1 " + mDistortion[0] +
-                    " k2 " + mDistortion[1] +
-                    " k3 " + mDistortion[2] +
-                    " k4 " + mDistortion[3] +
-                    " \nk5 " + mDistortion[4] +
-                    " k6 " + mDistortion[5]);
+            Timber.d("char lens intrinsics fx %f fy %f cx %f cy %f s %f",
+                    mIntrinsic[0], mIntrinsic[1], mIntrinsic[2], mIntrinsic[3], mIntrinsic[4]);
         mPreCorrectionSize =
                 result.get(CameraCharacteristics.SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE);
         if (mPreCorrectionSize != null)
-            Log.d(TAG, "Precorrection rect " + mPreCorrectionSize.toString());
+            Timber.d("Precorrection rect %s", mPreCorrectionSize.toString());
     }
 
     @TargetApi(21)
     private void setLensParams21(CameraCharacteristics result) {
         mPhysicalSize = result.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE);
         if (mPhysicalSize != null)
-            Log.d(TAG, "Physical size " + mPhysicalSize.toString());
+            Timber.d("Physical size %s", mPhysicalSize.toString());
         mPixelArraySize = result.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE);
         if (mPixelArraySize != null)
-            Log.d(TAG, "Pixel array size " + mPixelArraySize.toString());
+            Timber.d("Pixel array size %s", mPixelArraySize.toString());
         mActiveSize = result.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
         if (mActiveSize != null)
-            Log.d(TAG, "Active rect " + mActiveSize.toString());
+            Timber.d("Active rect %s", mActiveSize.toString());
     }
 }

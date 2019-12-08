@@ -53,7 +53,7 @@ public class CameraUtils {
                 return size;
             }
         }
-        Log.e(TAG, "Couldn't find any suitable video size");
+        Timber.e("Couldn't find any suitable video size");
         return choices[choices.length - 1];
     }
 
@@ -98,7 +98,7 @@ public class CameraUtils {
         if (bigEnough.size() > 0) {
             return Collections.min(bigEnough, new CompareSizesByArea());
         } else {
-            Log.e(TAG, "Couldn't find any suitable preview size");
+            Timber.e("Couldn't find any suitable preview size");
             return choices[0];
         }
     }
@@ -145,7 +145,7 @@ public class CameraUtils {
 
     public static int calcBitRate(int width, int height, int frame_rate) {
         final int bitrate = (int) (BPP * frame_rate * width * height);
-        Log.i(TAG, "bitrate=" + bitrate);
+        Timber.i("bitrate=%d", bitrate);
         return bitrate;
     }
 }

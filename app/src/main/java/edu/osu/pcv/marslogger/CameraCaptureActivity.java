@@ -29,7 +29,6 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
-import android.util.Log;
 import android.util.Size;
 import android.view.Display;
 import android.view.Surface;
@@ -175,7 +174,7 @@ public class CameraCaptureActivity extends Activity
 
         String dir3 = getExternalFilesDir(
                 Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
-        Log.d(TAG, "dir 1 " + dir1 + "\ndir 2 " + dir2 + "\ndir 3 " + dir3);
+        Timber.d("dir 1 %s\ndir 2 %s\ndir 3 %s", dir1, dir2, dir3);
         // dir1 and dir3 are always available for the app even the
         // write external storage permission is not granted.
         // "Apparently in Marshmallow when you install with Android studio it
@@ -276,12 +275,11 @@ public class CameraCaptureActivity extends Activity
             }
         });
         mImuManager.register();
-        Log.d(TAG, "onResume complete: " + this);
     }
 
     @Override
     protected void onPause() {
-        Log.d(TAG, "onPause -- releasing camera");
+        Timber.d("onPause -- releasing camera");
         super.onPause();
         // no more frame metadata will be saved during pause
         if (mCamera2Proxy != null) {
@@ -460,7 +458,7 @@ public class CameraCaptureActivity extends Activity
         // Since GLSurfaceView doesn't establish a Looper, this will *probably* execute on
         // the main UI thread.  Fortunately, requestRender() can be called from any thread,
         // so it doesn't really matter.
-        if (VERBOSE) Log.d(TAG, "ST onFrameAvailable");
+        if (VERBOSE) Timber.d("ST onFrameAvailable");
         mGLView.requestRender();
 
         final String sfps = String.format(Locale.getDefault(), "%.1f FPS",
@@ -507,18 +505,18 @@ public class CameraCaptureActivity extends Activity
             this.viewHeight = viewHeight;
             this.eventX = eventX;
             this.eventY = eventY;
-            Log.d(TAG, "manual focus " + eventX + " " + eventY + " " + viewWidth + " " + viewHeight);
+            Timber.d("manual focus %f %f %d %d", eventX, eventY, viewWidth, viewHeight);
             sendMessage(obtainMessage(MSG_MANUAL_FOCUS));
         }
 
         @Override  // runs on UI thread
         public void handleMessage(Message inputMessage) {
             int what = inputMessage.what;
-            Log.d(TAG, "CameraHandler [" + this + "]: what=" + what);
+            Timber.d("CameraHandler [%s]: what=%d", this.toString(), what);
 
             CameraCaptureActivity activity = mWeakActivity.get();
             if (activity == null) {
-                Log.w(TAG, "CameraHandler.handleMessage: activity is null");
+                Timber.w("CameraHandler.handleMessage: activity is null");
                 return;
             }
 
@@ -618,7 +616,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      */
     public void notifyPausing() {
         if (mSurfaceTexture != null) {
-            Log.d(TAG, "renderer pausing -- releasing SurfaceTexture");
+            Timber.d("renderer pausing -- releasing SurfaceTexture");
             mSurfaceTexture.release();
             mSurfaceTexture = null;
         }
@@ -633,7 +631,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      * Notifies the renderer that we want to stop or start recording.
      */
     public void changeRecordingState(boolean isRecording) {
-        Log.d(TAG, "changeRecordingState: was " + mRecordingEnabled + " now " + isRecording);
+        Timber.d("changeRecordingState: was %b now %b",mRecordingEnabled, isRecording);
         mRecordingEnabled = isRecording;
     }
 
@@ -652,7 +650,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
         float[] kernel = null;
         float colorAdj = 0.0f;
 
-        Log.d(TAG, "Updating filter to " + mNewFilter);
+        Timber.d("Updating filter to %d", mNewFilter);
         switch (mNewFilter) {
             case CameraCaptureActivity.FILTER_NONE:
                 programType = Texture2dProgram.ProgramType.TEXTURE_EXT;
@@ -720,7 +718,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      * so we at least know that they won't execute concurrently.)
      */
     public void setCameraPreviewSize(int width, int height) {
-        Log.d(TAG, "setCameraPreviewSize");
+        Timber.d("setCameraPreviewSize");
         mIncomingWidth = width;
         mIncomingHeight = height;
         mIncomingSizeUpdated = true;
@@ -728,7 +726,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceCreated(GL10 unused, EGLConfig config) {
-        Log.d(TAG, "onSurfaceCreated");
+        Timber.d("onSurfaceCreated");
 
         // We're starting up or coming back.  Either way we've got a new EGLContext that will
         // need to be shared with the video encoder, so figure out if a recording is already
@@ -759,13 +757,13 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceChanged(GL10 unused, int width, int height) {
-        Log.d(TAG, "onSurfaceChanged " + width + "x" + height);
+        Timber.d("onSurfaceChanged %dx%d", width, height);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
     @Override
     public void onDrawFrame(GL10 unused) {
-        if (VERBOSE) Log.d(TAG, "onDrawFrame tex=" + mTextureId);
+        if (VERBOSE) Timber.d("onDrawFrame tex=%d", mTextureId);
         boolean showBox = false;
 
         // Latch the latest frame.  If there isn't anything new, we'll just re-use whatever
@@ -778,7 +776,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
         if (mRecordingEnabled) {
             switch (mRecordingStatus) {
                 case RECORDING_OFF:
-                    Log.d(TAG, "START recording");
+                    Timber.d("START recording");
                     // TODO(jhuai): why does the height and width have to be swapped here?
                     mVideoEncoder.startRecording(
                             new TextureMovieEncoder.EncoderConfig(
@@ -793,7 +791,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                     mRecordingStatus = RECORDING_ON;
                     break;
                 case RECORDING_RESUMED:
-                    Log.d(TAG, "RESUME recording");
+                    Timber.d("RESUME recording");
                     mVideoEncoder.updateSharedContext(EGL14.eglGetCurrentContext());
                     mRecordingStatus = RECORDING_ON;
                     break;
@@ -808,7 +806,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                 case RECORDING_ON:
                 case RECORDING_RESUMED:
                     // stop recording
-                    Log.d(TAG, "STOP recording");
+                    Timber.d("STOP recording");
                     mVideoEncoder.stopRecording();
                     mRecordingStatus = RECORDING_OFF;
                     break;
@@ -835,7 +833,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
             // Texture size isn't set yet.  This is only used for the filters, but to be
             // safe we can just skip drawing while we wait for the various races to resolve.
             // (This seems to happen if you toggle the screen off/on with power button.)
-            Log.i(TAG, "Drawing before incoming texture size set; skipping");
+            Timber.i("Drawing before incoming texture size set; skipping");
             return;
         }
         // Update the filter, if necessary.

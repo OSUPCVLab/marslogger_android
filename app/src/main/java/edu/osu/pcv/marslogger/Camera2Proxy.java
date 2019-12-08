@@ -414,6 +414,8 @@ public class Camera2Proxy {
         }
     }
 
+    // TODO(jhuai): analyze the mechanism behind lock AF upon touch,
+    // make sure it won't cause sync issues with other Camera2Proxy methods
     void changeManualFocusPoint(float eventX, float eventY, int viewWidth, int viewHeight) {
         final int y = (int) ((eventX / (float) viewWidth) * (float) sensorArraySize.height());
         final int x = (int) ((eventY / (float) viewHeight) * (float) sensorArraySize.width());
