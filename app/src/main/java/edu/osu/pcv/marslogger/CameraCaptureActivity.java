@@ -17,6 +17,7 @@
 package edu.osu.pcv.marslogger;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraMetadata;
 import android.opengl.EGL14;
@@ -129,6 +130,19 @@ import timber.log.Timber;
  * continues to generate preview frames while the Activity is paused.)  The video encoder object
  * is managed as a static property of the Activity.
  */
+
+/**
+ * Dependency relations between the key components:
+ * CameraSurfaceRenderer onSurfaceCreated depends on mCameraHandler, and eventually mCamera2Proxy
+ * mCamera2Proxy initialization depends on onRequestPermissionsResult
+ *
+ * The order of calls in requesting permission from onCreate()
+ * activity.onCreate() -> requestCameraPermission()
+ * activity.onResume()
+ * activity.onPause()
+ * activity.onRequestPermissionsResult()
+ * activity.onResume()
+*/
 public class CameraCaptureActivity extends Activity
         implements SurfaceTexture.OnFrameAvailableListener, OnItemSelectedListener {
     public static final String TAG = "MarsLogger";
@@ -161,6 +175,10 @@ public class CameraCaptureActivity extends Activity
     private static IMUManager mImuManager;
 
     public Camera2Proxy getmCamera2Proxy() {
+        if (mCamera2Proxy == null) {
+            throw new RuntimeException(
+                "Get a null Camera2Proxy");
+        }
         return mCamera2Proxy;
     }
 
@@ -191,13 +209,7 @@ public class CameraCaptureActivity extends Activity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (BuildConfig.DEBUG) {
-            Timber.plant(new Timber.DebugTree());
-        }
-
         setContentView(R.layout.activity_camera_capture);
-
-        Eula.show(this);
 
         Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
@@ -206,6 +218,11 @@ public class CameraCaptureActivity extends Activity
         // Apply the adapter to the spinner.
         spinner.setAdapter(adapter);
         spinner.setOnItemSelectedListener(this);
+
+        mCamera2Proxy = new Camera2Proxy(this);
+        Size previewSize =
+                mCamera2Proxy.configureCamera(mDesiredFrameWidth, mDesiredFrameHeight);
+        setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
 
         // Define a handler that receives camera-control messages from other threads.  All calls
         // to Camera must be made on the same thread.  Note we create this before the renderer
@@ -223,10 +240,9 @@ public class CameraCaptureActivity extends Activity
         mGLView.setRenderer(mRenderer);
         mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         mGLView.setTouchListener((event, width, height) -> {
-            if (mCameraHandler != null) {
-                mCameraHandler.changeManualFocusPoint(
-                        event.getX(), event.getY(), width, height);
-            }
+            mCameraHandler.changeManualFocusPoint(
+                    event.getX(), event.getY(), width, height);
+
         });
 
         mImuManager = new IMUManager(this);
@@ -256,15 +272,11 @@ public class CameraCaptureActivity extends Activity
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         updateControls();
 
-        if (PermissionHelper.hasCameraPermission(this)) {
-            if (mCamera2Proxy == null) {
-                mCamera2Proxy = new Camera2Proxy(this);
-                Size previewSize =
-                        mCamera2Proxy.configureCamera(mDesiredFrameWidth, mDesiredFrameHeight);
-                setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
-            }
-        } else {
-            PermissionHelper.requestCameraPermission(this, false);
+        if (mCamera2Proxy == null) {
+            mCamera2Proxy = new Camera2Proxy(this);
+            Size previewSize =
+                    mCamera2Proxy.configureCamera(mDesiredFrameWidth, mDesiredFrameHeight);
+            setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
         }
 
         mGLView.onResume();
@@ -296,30 +308,14 @@ public class CameraCaptureActivity extends Activity
         });
         mGLView.onPause();
         mImuManager.unregister();
-        Log.d(TAG, "onPause complete");
+        Timber.d("onPause complete");
     }
 
     @Override
     protected void onDestroy() {
-        Log.d(TAG, "onDestroy");
+        Timber.d("onDestroy");
         super.onDestroy();
         mCameraHandler.invalidateHandler();     // paranoia
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (!PermissionHelper.hasCameraPermission(this)) {
-            Toast.makeText(this,
-                    "Camera permission is needed to run this application", Toast.LENGTH_LONG).show();
-            PermissionHelper.launchPermissionSettings(this);
-            finish();
-        } else {
-            mCamera2Proxy = new Camera2Proxy(this);
-            Size previewSize =
-                    mCamera2Proxy.configureCamera(mDesiredFrameWidth, mDesiredFrameHeight);
-            setLayoutAspectRatio(previewSize);
-        }
     }
 
     // spinner selected
@@ -328,7 +324,7 @@ public class CameraCaptureActivity extends Activity
         Spinner spinner = (Spinner) parent;
         final int filterNum = spinner.getSelectedItemPosition();
 
-        Log.d(TAG, "onItemSelected: " + filterNum);
+        Timber.d("onItemSelected: %d", filterNum);
         mGLView.queueEvent(new Runnable() {
             @Override
             public void run() {
@@ -356,17 +352,10 @@ public class CameraCaptureActivity extends Activity
             mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
             mImuManager.startRecording(inertialFile);
-            if (mCamera2Proxy != null) {
-                mCamera2Proxy.startRecordingCaptureResult(
-                        outputDir + File.separator + "movie_metadata.csv");
-            } else {
-                throw new RuntimeException("mCamera2Proxy should not be null upon toggling record button");
-            }
-
+            mCamera2Proxy.startRecordingCaptureResult(
+                    outputDir + File.separator + "movie_metadata.csv");
         } else {
-            if (mCamera2Proxy != null) {
-                mCamera2Proxy.stopRecordingCaptureResult();
-            }
+            mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
         }
         mGLView.queueEvent(new Runnable() {
@@ -526,12 +515,8 @@ public class CameraCaptureActivity extends Activity
                     break;
                 case MSG_MANUAL_FOCUS:
                     Camera2Proxy camera2proxy = activity.getmCamera2Proxy();
-                    if (camera2proxy != null) {
-                        // TODO(jhuai): analyze the mechanism behind lock AF upon touch,
-                        // make sure it won't cause sync issues with other Camera2Proxy methods
-                        camera2proxy.changeManualFocusPoint(
+                    camera2proxy.changeManualFocusPoint(
                                 eventX, eventY, viewWidth, viewHeight);
-                    }
                     break;
                 default:
                     throw new RuntimeException("unknown msg " + what);

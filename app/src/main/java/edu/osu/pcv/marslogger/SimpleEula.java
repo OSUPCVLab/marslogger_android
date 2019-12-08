@@ -12,6 +12,7 @@ import java.io.Closeable;
 
 // see http://upadhyayjiteshandroid.blogspot.com/2013/01/ndroid-adding-eulaend-user-license.html
 // and https://www.donnfelker.com/android-a-simple-eula-for-your-android-apps/
+// and https://web.archive.org/web/20130205134238/http://www.developer-resource.com/sample-eula.htm
 class Eula {
     private static final String ASSET_EULA = "EULA";
     private static final String PREFERENCE_EULA_ACCEPTED = "eula.accepted";
@@ -47,9 +48,7 @@ class Eula {
             builder.setPositiveButton(R.string.eula_accept, new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
                     accept(preferences);
-                    if (activity instanceof OnEulaAgreedTo) {
-                        ((OnEulaAgreedTo) activity).onEulaAgreedTo();
-                    }
+                    ((OnEulaAgreedTo) activity).onEulaAgreedTo();
                 }
             });
             builder.setNegativeButton(R.string.eula_refuse, new DialogInterface.OnClickListener() {
@@ -65,6 +64,8 @@ class Eula {
             builder.setMessage(readEula(activity));
             builder.create().show();
             return false;
+        } else {
+            ((OnEulaAgreedTo) activity).onEulaAgreedTo();
         }
         return true;
     }
