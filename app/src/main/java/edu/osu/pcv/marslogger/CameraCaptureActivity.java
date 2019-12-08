@@ -763,6 +763,9 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                 case RECORDING_OFF:
                     Timber.d("START recording");
                     // TODO(jhuai): why does the height and width have to be swapped here?
+                    // The output video has a size e.g., 720x1280. Video of the same size is recorded in
+                    // the portrait mode of the complex CameraRecorder-android at
+                    // https://github.com/MasayukiSuda/CameraRecorder-android.
                     mVideoEncoder.startRecording(
                             new TextureMovieEncoder.EncoderConfig(
                                     mOutputFile,
