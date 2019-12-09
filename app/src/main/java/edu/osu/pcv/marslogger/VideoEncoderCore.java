@@ -164,7 +164,6 @@ public class VideoEncoderCore {
             mEncoder.signalEndOfInputStream();
         }
 
-        ByteBuffer[] encoderOutputBuffers = mEncoder.getOutputBuffers();
         while (true) {
             int encoderStatus = mEncoder.dequeueOutputBuffer(mBufferInfo, TIMEOUT_USEC);
             if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
@@ -174,9 +173,6 @@ public class VideoEncoderCore {
                 } else {
                     if (VERBOSE) Timber.d("no output available, spinning to await EOS");
                 }
-            } else if (encoderStatus == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
-                // not expected for an encoder
-                encoderOutputBuffers = mEncoder.getOutputBuffers();
             } else if (encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                 // should happen before receiving buffers, and should only happen once
                 if (mMuxerStarted) {
@@ -193,7 +189,9 @@ public class VideoEncoderCore {
                 Timber.w("unexpected result from encoder.dequeueOutputBuffer: %d", encoderStatus);
                 // let's ignore it
             } else {
-                ByteBuffer encodedData = encoderOutputBuffers[encoderStatus];
+                ByteBuffer encodedData = mEncoder.getOutputBuffer(encoderStatus);
+//                MediaFormat bufferFormat = mEncoder.getOutputFormat(encoderStatus);
+                // bufferFormat is identical to newFormat
                 if (encodedData == null) {
                     throw new RuntimeException("encoderOutputBuffer " + encoderStatus +
                             " was null");
