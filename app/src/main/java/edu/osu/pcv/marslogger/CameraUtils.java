@@ -117,15 +117,14 @@ public class CameraUtils {
                 CameraCharacteristics characteristics =
                         manager.getCameraCharacteristics(cameraId);
                 try {
-                    // Try to find what direction it is pointing
-
+                    Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
                     // Check to see if the camera is facing the back, front, or external
-                    if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
-                            CameraMetadata.LENS_FACING_BACK) {
+                    if (facing == null) {
+                        entries[i] = cameraId + " - Lens External";
+                    } else if (facing == CameraMetadata.LENS_FACING_BACK) {
                         entries[i] = cameraId + " - Lens Facing Back";
                         rearCameraId = cameraId;
-                    } else if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
-                            CameraMetadata.LENS_FACING_FRONT) {
+                    } else if (facing == CameraMetadata.LENS_FACING_FRONT) {
                         entries[i] = cameraId + " - Lens Facing Front";
                     } else {
                         entries[i] = cameraId + " - Lens External";
