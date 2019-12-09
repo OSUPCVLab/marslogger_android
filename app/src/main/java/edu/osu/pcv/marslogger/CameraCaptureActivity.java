@@ -136,7 +136,7 @@ import timber.log.Timber;
  * CameraSurfaceRenderer onSurfaceCreated depends on mCameraHandler, and eventually mCamera2Proxy
  * mCamera2Proxy initialization depends on onRequestPermissionsResult
  *
- * The order of calls in requesting permission from onCreate()
+ * The order of calls in requesting permission inside onCreate()
  * activity.onCreate() -> requestCameraPermission()
  * activity.onResume()
  * activity.onPause()
@@ -162,7 +162,10 @@ public class CameraCaptureActivity extends Activity
 
     private SampleGLView mGLView;
     private CameraSurfaceRenderer mRenderer;
+
+    private TextView mKeyCameraParamsText;
     private TextView mCaptureResultText;
+    private TextView mOutputDirText;
 
     private Camera2Proxy mCamera2Proxy = null;
     private CameraHandler mCameraHandler;
@@ -170,9 +173,8 @@ public class CameraCaptureActivity extends Activity
 
     private int mCameraPreviewWidth, mCameraPreviewHeight;
 
-    // this is static so it survives activity restarts
-    private static TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
-    private static IMUManager mImuManager;
+    private TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
+    private IMUManager mImuManager;
 
     public Camera2Proxy getmCamera2Proxy() {
         if (mCamera2Proxy == null) {
@@ -242,11 +244,13 @@ public class CameraCaptureActivity extends Activity
         mGLView.setTouchListener((event, width, height) -> {
             mCameraHandler.changeManualFocusPoint(
                     event.getX(), event.getY(), width, height);
-
         });
 
         mImuManager = new IMUManager(this);
+
+        mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
+        mOutputDirText = (TextView) findViewById(R.id.cameraOutputDir_text);
     }
 
     // updates mCameraPreviewWidth/Height
@@ -347,8 +351,7 @@ public class CameraCaptureActivity extends Activity
             String outputDir = renewOutputDir();
             String outputFile = outputDir + File.separator + "movie.mp4";
             String metaFile = outputDir + File.separator + "frame_timestamps.txt";
-            TextView fileText = (TextView) findViewById(R.id.cameraOutputDir_text);
-            fileText.setText(outputDir);
+            mOutputDirText.setText(outputDir);
             mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
             mImuManager.startRecording(inertialFile);
@@ -454,8 +457,7 @@ public class CameraCaptureActivity extends Activity
                 sVideoEncoder.mFrameRate);
         String previewFacts = mCameraPreviewWidth + "x" + mCameraPreviewHeight + "@" + sfps;
 
-        TextView text = (TextView) findViewById(R.id.cameraParams_text);
-        text.setText(previewFacts);
+        mKeyCameraParamsText.setText(previewFacts);
     }
 
     /**
@@ -569,7 +571,6 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      *
      * @param cameraHandler Handler for communicating with UI thread
      * @param movieEncoder  video encoder object
-     * @param outputFile    output file for encoded video; forwarded to movieEncoder
      */
     public CameraSurfaceRenderer(CameraCaptureActivity.CameraHandler cameraHandler,
                                  TextureMovieEncoder movieEncoder) {
@@ -616,7 +617,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      * Notifies the renderer that we want to stop or start recording.
      */
     public void changeRecordingState(boolean isRecording) {
-        Timber.d("changeRecordingState: was %b now %b",mRecordingEnabled, isRecording);
+        Timber.d("changeRecordingState: was %b now %b", mRecordingEnabled, isRecording);
         mRecordingEnabled = isRecording;
     }
 
