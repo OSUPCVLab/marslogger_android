@@ -53,11 +53,13 @@ public class VideoEncoderCore {
     private Surface mInputSurface;
     private MediaMuxer mMuxer;
     private MediaCodec mEncoder;
+    private boolean mEncoderInExecutingState = false;
     private MediaCodec.BufferInfo mBufferInfo;
     private int mTrackIndex;
     private boolean mMuxerStarted;
     private BufferedWriter mFrameMetadataWriter = null;
     private ArrayList<Long> mTimeArray = null;
+    final int TIMEOUT_USEC = 10000;
 
     /**
      * Configures encoder and muxer state, and prepares the input Surface.
@@ -84,6 +86,15 @@ public class VideoEncoderCore {
         mEncoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         mInputSurface = mEncoder.createInputSurface();
         mEncoder.start();
+
+        try {
+            mEncoder.dequeueOutputBuffer(mBufferInfo, TIMEOUT_USEC);
+            mEncoderInExecutingState = true;
+        } catch (IllegalStateException ise) {
+            // This exception occurs with certain devices e.g., Nexus 9 API 22.
+            Timber.e(ise);
+            mEncoderInExecutingState = false;
+        }
 
         // Create a MediaMuxer.  We can't add the video track and start() the muxer here,
         // because our MediaFormat doesn't have the Magic Goodies.  These can only be
@@ -156,7 +167,6 @@ public class VideoEncoderCore {
      * not recording audio.
      */
     public void drainEncoder(boolean endOfStream) {
-        final int TIMEOUT_USEC = 10000;
         if (VERBOSE) Timber.d("drainEncoder(%b)", endOfStream);
 
         if (endOfStream) {
@@ -164,7 +174,7 @@ public class VideoEncoderCore {
             mEncoder.signalEndOfInputStream();
         }
 
-        while (true) {
+        while (mEncoderInExecutingState) {
             int encoderStatus = mEncoder.dequeueOutputBuffer(mBufferInfo, TIMEOUT_USEC);
             if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 // no output available yet
