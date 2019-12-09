@@ -6,6 +6,7 @@ package edu.osu.pcv.marslogger;
 import android.annotation.TargetApi;
 import android.graphics.Rect;
 import android.hardware.camera2.CameraCharacteristics;
+import android.os.Build;
 import android.util.Log;
 import android.util.Size;
 import android.util.SizeF;
@@ -32,10 +33,11 @@ public class FocalLengthHelper {
 
     public void setLensParams(CameraCharacteristics result) {
         setLensParams21(result);
-        setLensParams23(result);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            setLensParams23(result);
+        }
     }
 
-    @TargetApi(23)
     public void setmCropRegion(Rect mCropRegion) {
         this.mCropRegion = mCropRegion;
     }
@@ -104,7 +106,6 @@ public class FocalLengthHelper {
             Timber.d("Precorrection rect %s", mPreCorrectionSize.toString());
     }
 
-    @TargetApi(21)
     private void setLensParams21(CameraCharacteristics result) {
         mPhysicalSize = result.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE);
         if (mPhysicalSize != null)

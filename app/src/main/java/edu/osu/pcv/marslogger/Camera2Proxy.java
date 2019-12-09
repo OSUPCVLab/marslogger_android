@@ -127,7 +127,6 @@ public class Camera2Proxy {
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.M)
     public Camera2Proxy(Activity activity) {
         mActivity = activity;
         mCameraManager = (CameraManager) mActivity.getSystemService(Context.CAMERA_SERVICE);
