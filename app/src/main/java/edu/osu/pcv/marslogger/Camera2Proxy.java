@@ -147,8 +147,9 @@ public class Camera2Proxy {
 
             StreamConfigurationMap map = mCameraCharacteristics.get(CameraCharacteristics
                     .SCALER_STREAM_CONFIGURATION_MAP);
-            mVideoSize = CameraUtils.chooseVideoSize(
-                    map.getOutputSizes(MediaRecorder.class), width, height, width);
+
+            Size[] videoSizeChoices = map.getOutputSizes(MediaRecorder.class);
+            mVideoSize = CameraUtils.chooseVideoSize(videoSizeChoices, width, height, width);
 
             mFocalLengthHelper.setLensParams(mCameraCharacteristics);
             mFocalLengthHelper.setmImageSize(mVideoSize);

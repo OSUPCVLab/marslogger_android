@@ -19,8 +19,8 @@
     <!-- TODO: organize this a bit -->
 
     <string name="app_name">MarsLogger</string>
-    <string name="cameraOutputFileLabel_text">Output file:</string>
-    <string name="cameraOutputFile_text">[filename]</string>
+    <string name="cameraOutputDirLabel_text">Output dir:</string>
+    <string name="cameraOutputDir_text">[dirname]</string>
     <string name="toggleRecordingOn">Record</string>
     <string name="toggleRecordingOff">Stop</string>
 
