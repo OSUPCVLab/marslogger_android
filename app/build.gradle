@@ -42,6 +42,18 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    flavorDimensions("freedom")
+    productFlavors {
+        google {
+            dimension "freedom"
+            buildConfigField "boolean", "DONATIONS_GOOGLE", "true"
+        }
+        fdroid {
+            dimension "freedom"
+            buildConfigField "boolean", "DONATIONS_GOOGLE", "false"
+        }
+    }
 }
 
 dependencies {

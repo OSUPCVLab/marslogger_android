@@ -354,7 +354,8 @@ public class CameraCaptureActivity extends Activity
             String outputDir = renewOutputDir();
             String outputFile = outputDir + File.separator + "movie.mp4";
             String metaFile = outputDir + File.separator + "frame_timestamps.txt";
-            mOutputDirText.setText(outputDir);
+            String basename=outputDir.substring(outputDir.lastIndexOf("/")+1);
+            mOutputDirText.setText(basename);
             mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
             mImuManager.startRecording(inertialFile);

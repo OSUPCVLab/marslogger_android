@@ -7,30 +7,56 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:fitsSystemWindows="true"
-    tools:context=".MainActivity">
+    tools:context=".InfoActivity">
 
     <ScrollView
-        android:id="@+id/SCROLLER_ID"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:scrollbars="vertical"
         android:layout_weight="1"
         android:fillViewport="true">
-        <TextView
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:text="MarsLogger was developed by Jianzhu Huai for efficiently recording
-camera and IMU data on a mobile device. The source code for the app is at\n\n
+            android:layout_height="wrap_content"
+            android:isScrollContainer="true"
+            android:orientation="vertical"
+            android:padding="15dp"
+            android:scrollbars="vertical" >
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="MarsLogger is developed by Jianzhu Huai for efficiently
+recording synced camera and IMU data on a mobile device.
+The source code for the app is at\n\n
 https://github.com/OSUPCVLab/mobile-ar-sensor-logger\n\n
 All data sessions are saved in '/Android/data/edu.osu.pcv.marslogger/files/data/'
 on the SD card.
-Each data session is in a folder named after the local time at the start of recording.
+Each data session in a folder named after the local time at the start of recording has four files.\n
+1. movie.mp4: Camera frames of size 720x1280 at ~30Hz.\n
+2. frame_timestamps.txt: timestamp for each frame.\n
+3. movie_metadata.csv: metadata including focal distance, focal length in pixels, etc.\n
+4. gyro_accel.csv: IMU data.\n
 \n\n"
-            android:id="@+id/textView"
-            android:layout_gravity="center_horizontal"
-            android:layout_margin="10pt"
-            android:textIsSelectable="true"
-            android:textAppearance="?android:attr/textAppearanceMedium"/>
+                android:id="@+id/textView"
+                android:layout_gravity="center_horizontal"
+                android:textIsSelectable="true"
+                android:textAppearance="?android:attr/textAppearanceMedium"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Do you find this application useful?\nSupport its development by sending a donation to the developer!"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <ViewStub
+                android:id="@+id/donations__paypal_stub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inflatedId="@+id/donations__paypal"
+                android:layout="@layout/donations__fragment_paypal" />
+        </LinearLayout>
     </ScrollView>
 
     <LinearLayout
@@ -49,5 +75,3 @@ Each data session is in a folder named after the local time at the start of reco
         </Button>
     </LinearLayout>
 </LinearLayout>
-
-
