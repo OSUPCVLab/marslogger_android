@@ -1,4 +1,11 @@
 apply plugin: 'com.android.application'
+// Display Xlint warnings. More info is at
+// https://stackoverflow.com/questions/27274526/how-to-add-java-compiler-options-when-compiling-with-android-gradle-plugin/27274527
+gradle.projectsEvaluated {
+    tasks.withType(JavaCompile) {
+        options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+    }
+}
 
 android {
     signingConfigs {
