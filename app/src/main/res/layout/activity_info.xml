@@ -40,7 +40,7 @@ Each data session in a folder named after the local time at the start of recordi
 4. gyro_accel.csv: IMU data.\n
 \n\n"
                 android:id="@+id/textView"
-                android:layout_gravity="center_horizontal"
+                android:layout_gravity="center_horizontal|top"
                 android:textIsSelectable="true"
                 android:textAppearance="?android:attr/textAppearanceMedium"/>
 

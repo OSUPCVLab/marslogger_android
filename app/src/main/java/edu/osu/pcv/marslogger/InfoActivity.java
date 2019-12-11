@@ -1,11 +1,11 @@
 package edu.osu.pcv.marslogger;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewStub;
@@ -14,7 +14,7 @@ import android.widget.Spinner;
 
 // TODO(jhuai): use a toolbar(import android.support.v7.widget.Toolbar) to navigate the activities
 // see ch8 p313 of head first Android development a brain friendly guide
-public class InfoActivity extends AppCompatActivity {
+public class InfoActivity extends Activity {
     private static final String TAG = InfoActivity.class.getName();;
     protected boolean mGoogleEnabled = false;
     protected boolean mPaypalEnabled = true;

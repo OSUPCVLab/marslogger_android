@@ -19,6 +19,40 @@
     android:layout_height="match_parent"
     tools:context=".CameraCaptureActivity">
 
+    <LinearLayout
+        android:id="@+id/LinearLayoutHeader"
+        android:orientation="horizontal"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_marginTop="@dimen/activity_top_margin">
+
+        <Button
+            android:id="@+id/toggleRecording_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="@dimen/activity_horizontal_margin"
+            android:onClick="clickToggleRecording"
+            android:text="@string/toggleRecordingOn"/>
+
+        <Spinner
+            android:id="@+id/cameraFilter_spinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:layout_marginStart="@dimen/activity_horizontal_margin"/>
+
+        <ImageButton
+            android:id="@+id/info_button"
+            android:layout_width="@dimen/button_height"
+            android:layout_height="@dimen/button_height"
+            android:layout_gravity="center"
+            android:layout_marginStart="@dimen/activity_horizontal_margin"
+            android:layout_marginEnd="@dimen/activity_horizontal_margin"
+            android:background="@drawable/icons8_info_256"
+            android:onClick="clickInfo"/>
+    </LinearLayout>
+
     <edu.osu.pcv.marslogger.AspectFrameLayout
         android:id="@+id/cameraPreview_afl"
         android:layout_width="match_parent"
@@ -26,7 +60,7 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="4dp"
-        android:layout_below="@+id/toggleRecording_button"
+        android:layout_below="@id/LinearLayoutHeader"
         android:layout_centerInParent="true">
 
         <edu.osu.pcv.marslogger.SampleGLView
@@ -36,43 +70,13 @@
             android:layout_gravity="center" />
     </edu.osu.pcv.marslogger.AspectFrameLayout>
 
-    <Button
-        android:id="@+id/toggleRecording_button"
-        style="?android:attr/buttonStyle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/activity_top_margin"
-        android:layout_marginStart="@dimen/activity_horizontal_margin"
-        android:layout_alignParentStart="true"
-        android:onClick="clickToggleRecording"
-        android:text="@string/toggleRecordingOn"/>
-
-    <Spinner
-        android:id="@+id/cameraFilter_spinner"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/activity_top_margin"
-        android:layout_centerHorizontal="true"
-        android:layout_marginStart="@dimen/activity_horizontal_margin"/>
-
-    <ImageButton
-        android:id="@+id/info_button"
-        android:layout_width="@dimen/button_height"
-        android:layout_height="@dimen/button_height"
-        android:layout_marginTop="@dimen/activity_top_margin"
-        android:layout_marginEnd="@dimen/activity_horizontal_margin"
-        android:layout_alignParentEnd="true"
-        android:background="@drawable/icons8_info_256"
-        android:onClick="clickInfo"
-        android:contentDescription="button_info"/>
-
     <!-- these overlap with the SurfaceView; by default, it's underneath the UI layer -->
 
     <TextView
         android:id="@+id/cameraParams_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/toggleRecording_button"
+        android:layout_below="@id/LinearLayoutHeader"
         android:layout_alignStart="@id/cameraPreview_afl"
         android:layout_marginStart="@dimen/activity_horizontal_margin"
         android:text="[?]"
