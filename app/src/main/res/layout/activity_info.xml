@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    tools:context=".MainActivity">
+
+    <ScrollView
+        android:id="@+id/SCROLLER_ID"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:scrollbars="vertical"
+        android:layout_weight="1"
+        android:fillViewport="true">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="MarsLogger was developed by Jianzhu Huai for efficiently recording
+camera and IMU data on a mobile device. The source code for the app is at\n\n
+https://github.com/OSUPCVLab/mobile-ar-sensor-logger\n\n
+All data sessions are saved in '/Android/data/edu.osu.pcv.marslogger/files/data/'
+on the SD card.
+Each data session is in a folder named after the local time at the start of recording.
+\n\n"
+            android:id="@+id/textView"
+            android:layout_gravity="center_horizontal"
+            android:layout_margin="10pt"
+            android:textIsSelectable="true"
+            android:textAppearance="?android:attr/textAppearanceMedium"/>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/LinearLayout02"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent">
+        <Button
+            android:id="@+id/button_done"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginBottom="-5dp"
+            android:layout_marginLeft="-4dp"
+            android:layout_marginRight="-4dp"
+            android:text="Done">
+        </Button>
+    </LinearLayout>
+</LinearLayout>
+
+

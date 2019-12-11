@@ -18,6 +18,7 @@ package edu.osu.pcv.marslogger;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraMetadata;
 import android.opengl.EGL14;
@@ -210,7 +211,9 @@ public class CameraCaptureActivity extends Activity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        // Occasionally some device show landscape views despite the portrait in manifest. See
+        // https://stackoverflow.com/questions/47228194/android-8-1-screen-orientation-issue-flipping-to-landscape-a-portrait-screen
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         setContentView(R.layout.activity_camera_capture);
 
         Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
@@ -379,6 +382,14 @@ public class CameraCaptureActivity extends Activity
 //        TextureRender.sWorkAroundContextProblem = cb.isChecked();
 //    }
 
+    /**
+     * Display the info fragment
+     * @param unused
+     */
+    public void clickInfo(@SuppressWarnings("unused") View unused) {
+        Intent infoIntent = new Intent(this, InfoActivity.class);
+        startActivity(infoIntent);
+    }
 
     public void updateCaptureResultPanel(
             final Float fl,
