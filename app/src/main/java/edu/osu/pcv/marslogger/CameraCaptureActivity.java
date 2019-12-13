@@ -245,8 +245,11 @@ public class CameraCaptureActivity extends Activity
         mGLView.setRenderer(mRenderer);
         mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         mGLView.setTouchListener((event, width, height) -> {
-            mCameraHandler.changeManualFocusPoint(
-                    event.getX(), event.getY(), width, height);
+            ManualFocusConfig focusConfig =
+                    new ManualFocusConfig(event.getX(), event.getY(), width, height);
+            Timber.d(focusConfig.toString());
+            mCameraHandler.sendMessage(
+                    mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
 
         mImuManager = new IMUManager(this);
@@ -483,11 +486,6 @@ public class CameraCaptureActivity extends Activity
         public static final int MSG_SET_SURFACE_TEXTURE = 0;
         public static final int MSG_MANUAL_FOCUS = 1;
 
-        private int viewWidth = 0;
-        private int viewHeight = 0;
-        private float eventX = 0;
-        private float eventY = 0;
-
         // Weak reference to the Activity; only access this from the UI thread.
         private WeakReference<CameraCaptureActivity> mWeakActivity;
 
@@ -503,18 +501,12 @@ public class CameraCaptureActivity extends Activity
             mWeakActivity.clear();
         }
 
-        void changeManualFocusPoint(float eventX, float eventY, int viewWidth, int viewHeight) {
-            this.viewWidth = viewWidth;
-            this.viewHeight = viewHeight;
-            this.eventX = eventX;
-            this.eventY = eventY;
-            Timber.d("manual focus %f %f %d %d", eventX, eventY, viewWidth, viewHeight);
-            sendMessage(obtainMessage(MSG_MANUAL_FOCUS));
-        }
 
         @Override  // runs on UI thread
         public void handleMessage(Message inputMessage) {
             int what = inputMessage.what;
+            Object obj = inputMessage.obj;
+
             Timber.d("CameraHandler [%s]: what=%d", this.toString(), what);
 
             CameraCaptureActivity activity = mWeakActivity.get();
@@ -529,8 +521,7 @@ public class CameraCaptureActivity extends Activity
                     break;
                 case MSG_MANUAL_FOCUS:
                     Camera2Proxy camera2proxy = activity.getmCamera2Proxy();
-                    camera2proxy.changeManualFocusPoint(
-                                eventX, eventY, viewWidth, viewHeight);
+                    camera2proxy.changeManualFocusPoint((ManualFocusConfig)obj);
                     break;
                 default:
                     throw new RuntimeException("unknown msg " + what);
