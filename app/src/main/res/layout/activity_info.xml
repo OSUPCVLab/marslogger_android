@@ -28,9 +28,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="MarsLogger is developed by Jianzhu Huai for efficiently
-recording synced camera and IMU data on a mobile device.
-The source code for the app is at\n\n
-https://github.com/OSUPCVLab/mobile-ar-sensor-logger\n\n
+recording synced camera and IMU data on a mobile device."
+                android:id="@+id/forewordTextView"
+                android:layout_gravity="center_horizontal"
+                android:textIsSelectable="true"
+                android:textAppearance="?android:attr/textAppearanceMedium"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/linkTextView"
+                android:layout_gravity="center_horizontal"
+                android:textIsSelectable="true"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:text="@string/link_foreword"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/epilogueTextView"
+                android:layout_gravity="center_horizontal"
+                android:textIsSelectable="true"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:text="
 All data sessions are saved in '/Android/data/edu.osu.pcv.marslogger/files/data/'
 on the SD card.
 Each data session in a folder named after the local time at the start of recording has four files.\n
@@ -38,11 +58,7 @@ Each data session in a folder named after the local time at the start of recordi
 2. frame_timestamps.txt: timestamp for each frame.\n
 3. movie_metadata.csv: metadata including focal distance, focal length in pixels, etc.\n
 4. gyro_accel.csv: IMU data.\n
-\n\n"
-                android:id="@+id/textView"
-                android:layout_gravity="center_horizontal|top"
-                android:textIsSelectable="true"
-                android:textAppearance="?android:attr/textAppearanceMedium"/>
+\n\n"/>
 
             <TextView
                 android:layout_width="match_parent"
