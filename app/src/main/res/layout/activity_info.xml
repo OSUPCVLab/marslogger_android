@@ -53,7 +53,7 @@ recording synced camera and IMU data on a mobile device."
                 android:text="
 All data sessions are saved in '/Android/data/edu.osu.pcv.marslogger/files/data/'
 on the SD card.
-Each data session in a folder named after the local time at the start of recording has four files.\n
+Each data session in a folder named after the local time at the start of recording has five files.\n
 1. movie.mp4: Camera frames of size 720x1280 at ~30Hz.\n
 2. frame_timestamps.txt: timestamp for each frame.\n
 3. movie_metadata.csv: metadata including focal distance, focal length in pixels, etc.\n
