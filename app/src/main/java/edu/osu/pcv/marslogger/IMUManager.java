@@ -63,10 +63,17 @@ public class IMUManager implements SensorEventListener {
         try {
             mDataWriter = new BufferedWriter(
                     new FileWriter(captureResultFile, false));
-            String header = "Timestamp[nanosec], gx[rad/s], gy[rad/s], gz[rad/s]," +
-                    " ax[m/s^2], ay[m/s^2], az[m/s^2]\n";
-
-            mDataWriter.write(header);
+            if (mGyro == null || mAccel == null) {
+                String warning = "The device may not have a gyroscope or an accelerometer!\n" +
+                        "No IMU data will be logged.\n" +
+                        "Has Gyroscope? " + (mGyro == null ? "No":"Yes") + "\n"
+                        + "Has Accelerometer? " + (mAccel == null ? "No":"Yes") + "\n";
+                mDataWriter.write(warning);
+            } else {
+                String header = "Timestamp[nanosec], gx[rad/s], gy[rad/s], gz[rad/s]," +
+                        " ax[m/s^2], ay[m/s^2], az[m/s^2]\n";
+                mDataWriter.write(header);
+            }
             mRecordingInertialData = true;
         } catch (IOException err) {
             Timber.e(err,"IOException in opening inertial data writer at %s",

@@ -58,6 +58,7 @@ Each data session in a folder named after the local time at the start of recordi
 2. frame_timestamps.txt: timestamp for each frame.\n
 3. movie_metadata.csv: metadata including focal distance, focal length in pixels, etc.\n
 4. gyro_accel.csv: IMU data.\n
+5. edge_epochs.txt: timestamps at the start and end of recording.\n
 \n\n"/>
 
             <TextView

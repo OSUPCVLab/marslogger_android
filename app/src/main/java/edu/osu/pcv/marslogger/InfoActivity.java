@@ -50,7 +50,7 @@ public class InfoActivity extends Activity {
         TextView hyperlink = (TextView) findViewById(R.id.linkTextView);
         String linkText = getResources().getString(R.string.link_foreword);
         Spanned text = fromHtml(linkText + " " +
-                "<a href='https://github.com/OSUPCVLab/mobile-ar-sensor-logger/'>github</a>.");
+                "<a href='https://github.com/OSUPCVLab/mobile-ar-sensor-logger/'>GitHub</a>.");
         hyperlink.setMovementMethod(LinkMovementMethod.getInstance());
         hyperlink.setText(text);
 

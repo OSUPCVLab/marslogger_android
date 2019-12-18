@@ -56,6 +56,7 @@ public class Camera2Proxy {
     private CameraCaptureSession mCaptureSession;
     private CaptureRequest.Builder mPreviewRequestBuilder;
     private Rect sensorArraySize;
+    private Integer mTimeSourceValue;
 
     private CaptureRequest mPreviewRequest;
     private Handler mBackgroundHandler;
@@ -96,6 +97,10 @@ public class Camera2Proxy {
             releaseCamera();
         }
     };
+
+    public Integer getmTimeSourceValue() {
+        return mTimeSourceValue;
+    }
 
     public void startRecordingCaptureResult(String captureResultFile) {
         try {
@@ -144,6 +149,8 @@ public class Camera2Proxy {
             mCameraCharacteristics = mCameraManager.getCameraCharacteristics(mCameraIdStr);
             sensorArraySize = mCameraCharacteristics.get(
                     CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            mTimeSourceValue = mCameraCharacteristics.get(
+                    CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE);
 
             StreamConfigurationMap map = mCameraCharacteristics.get(CameraCharacteristics
                     .SCALER_STREAM_CONFIGURATION_MAP);

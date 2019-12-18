@@ -176,6 +176,7 @@ public class CameraCaptureActivity extends Activity
 
     private TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
     private IMUManager mImuManager;
+    private TimeBaseManager mTimeBaseManager;
 
     public Camera2Proxy getmCamera2Proxy() {
         if (mCamera2Proxy == null) {
@@ -253,6 +254,7 @@ public class CameraCaptureActivity extends Activity
         });
 
         mImuManager = new IMUManager(this);
+        mTimeBaseManager = new TimeBaseManager();
 
         mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
@@ -361,12 +363,15 @@ public class CameraCaptureActivity extends Activity
             mOutputDirText.setText(basename);
             mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
+            String edgeEpochFile = outputDir + File.separator + "edge_epochs.txt";
+            mTimeBaseManager.startRecording(edgeEpochFile, mCamera2Proxy.getmTimeSourceValue());
             mImuManager.startRecording(inertialFile);
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
+            mTimeBaseManager.stopRecording();
         }
         mGLView.queueEvent(new Runnable() {
             @Override
