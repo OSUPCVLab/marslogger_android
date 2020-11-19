@@ -21,6 +21,8 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraMetadata;
+import android.media.Image;
+import android.media.ImageReader;
 import android.opengl.EGL14;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
@@ -167,6 +169,9 @@ public class CameraCaptureActivity extends Activity
     private TextView mKeyCameraParamsText;
     private TextView mCaptureResultText;
     private TextView mOutputDirText;
+    private String mSnapshotOutputDir = null;
+    private boolean mSnap = false;
+    private int mSnapNumber = 0;
 
     private Camera2Proxy mCamera2Proxy = null;
     private CameraHandler mCameraHandler;
@@ -217,13 +222,13 @@ public class CameraCaptureActivity extends Activity
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         setContentView(R.layout.activity_camera_capture);
 
-        Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
-                R.array.cameraFilterNames, android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        // Apply the adapter to the spinner.
-        spinner.setAdapter(adapter);
-        spinner.setOnItemSelectedListener(this);
+//        Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
+//        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+//                R.array.cameraFilterNames, android.R.layout.simple_spinner_item);
+//        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+//        // Apply the adapter to the spinner.
+//        spinner.setAdapter(adapter);
+//        spinner.setOnItemSelectedListener(this);
 
         mCamera2Proxy = new Camera2Proxy(this);
         Size previewSize =
@@ -310,6 +315,9 @@ public class CameraCaptureActivity extends Activity
             mCamera2Proxy.releaseCamera();
             mCamera2Proxy = null;
         }
+        mSnapshotOutputDir = null;
+        mSnap = false;
+        mSnapNumber = 0;
 
         mGLView.queueEvent(new Runnable() {
             @Override
@@ -359,7 +367,7 @@ public class CameraCaptureActivity extends Activity
             String outputDir = renewOutputDir();
             String outputFile = outputDir + File.separator + "movie.mp4";
             String metaFile = outputDir + File.separator + "frame_timestamps.txt";
-            String basename=outputDir.substring(outputDir.lastIndexOf("/")+1);
+            String basename = outputDir.substring(outputDir.lastIndexOf("/")+1);
             mOutputDirText.setText(basename);
             mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
@@ -382,6 +390,49 @@ public class CameraCaptureActivity extends Activity
         });
         updateControls();
     }
+
+    public void clickSnapshot(@SuppressWarnings("unused") View unused) {
+        if (mRecordingEnabled) {
+            return;
+        }
+        if (mSnapshotOutputDir != null) {
+            mCamera2Proxy.resumeRecordingCaptureResult();
+            mSnap = true;
+        } else {
+            mSnapshotOutputDir = renewOutputDir();
+            String basename = mSnapshotOutputDir.substring(mSnapshotOutputDir.lastIndexOf("/") + 1);
+            mOutputDirText.setText(basename);
+            mSnapNumber = 0;
+            mCamera2Proxy.startRecordingCaptureResult(
+                    mSnapshotOutputDir + File.separator + "movie_metadata.csv");
+            mSnap = true;
+        }
+        TextView numSnapshotView = (TextView) findViewById(R.id.numSnapshot_text);
+        numSnapshotView.setText(String.valueOf(mSnapNumber + 1));
+    }
+
+//    https://github.com/almalence/OpenCamera/blob/master/src/com/almalence/opencam/cameracontroller/Camera2Controller.java#L3455
+//    https://stackoverflow.com/questions/34664131/camera2-imagereader-freezes-repeating-capture-request
+    public final ImageReader.OnImageAvailableListener mImageAvailableListener =
+            new ImageReader.OnImageAvailableListener() {
+                @Override
+                public void onImageAvailable(ImageReader ir) {
+                    if (mSnap) {
+                        Image image = ir.acquireNextImage();
+                        Long timestamp = image.getTimestamp();
+                        String outputFile = mSnapshotOutputDir + File.separator + timestamp.toString() + ".jpg";
+                        File dest = new File(outputFile);
+                        Timber.d("Saving image to %s", outputFile);
+                        new ImageSaver(image, dest).run();
+                        mSnap = false;
+                        ++mSnapNumber;
+                        mCamera2Proxy.pauseRecordingCaptureResult();
+                    } else {
+                        Image image = ir.acquireLatestImage();
+                        image.close();
+                    }
+                }
+            };
 
 //    /**
 //     * onClick handler for "rebind" checkbox.

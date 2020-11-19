@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -37,6 +38,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 
 import timber.log.Timber;
 
@@ -77,12 +79,14 @@ public class Camera2Proxy {
 
     private FocalLengthHelper mFocalLengthHelper = new FocalLengthHelper();
 
+    public boolean mSupportSnapshot = true; // Previewing both video frames and image frames slows down video frame rate.
+
     private CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             Timber.d("onOpened");
             mCameraDevice = camera;
-            initPreviewRequest();
+            initPreviewRequest(mSupportSnapshot);
         }
 
         @Override
@@ -104,8 +108,17 @@ public class Camera2Proxy {
 
     public void startRecordingCaptureResult(String captureResultFile) {
         try {
+            if (mFrameMetadataWriter != null) {
+                try {
+                    mFrameMetadataWriter.flush();
+                    mFrameMetadataWriter.close();
+                    Log.d(TAG, "Flushing results!");
+                } catch (IOException err) {
+                    Timber.e(err, "IOException in closing an earlier frameMetadataWriter.");
+                }
+            }
             mFrameMetadataWriter = new BufferedWriter(
-                    new FileWriter(captureResultFile, false));
+                    new FileWriter(captureResultFile, true));
             String header = "Timestamp[nanosec],fx[px],fy[px],Frame No.," +
                     "Exposure time[nanosec],Sensor frame duration[nanosec]," +
                     "Frame readout time[nanosec]," +
@@ -119,9 +132,19 @@ public class Camera2Proxy {
         }
     }
 
+    public void resumeRecordingCaptureResult() {
+        mRecordingMetadata = true;
+    }
+
+    public void pauseRecordingCaptureResult() {
+        mRecordingMetadata = false;
+    }
+
     public void stopRecordingCaptureResult() {
         if (mRecordingMetadata) {
             mRecordingMetadata = false;
+        }
+        if (mFrameMetadataWriter != null) {
             try {
                 mFrameMetadataWriter.flush();
                 mFrameMetadataWriter.close();
@@ -180,6 +203,7 @@ public class Camera2Proxy {
         if (mCameraIdStr.isEmpty()) {
             configureCamera(width, height);
         }
+        initImageReader(width, height);
         try {
             mCameraManager.openCamera(mCameraIdStr, mStateCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
@@ -208,15 +232,6 @@ public class Camera2Proxy {
         stopBackgroundThread();
     }
 
-    public void setImageAvailableListener(ImageReader.OnImageAvailableListener
-                                                  onImageAvailableListener) {
-        if (mImageReader == null) {
-            Timber.w("setImageAvailableListener: mImageReader is null");
-            return;
-        }
-        mImageReader.setOnImageAvailableListener(onImageAvailableListener, null);
-    }
-
     public void setPreviewSurface(SurfaceHolder holder) {
         mPreviewSurface = holder.getSurface();
     }
@@ -225,6 +240,28 @@ public class Camera2Proxy {
         mPreviewSurfaceTexture = surfaceTexture;
     }
 
+    private void initImageReader(int width, int height) {
+        StreamConfigurationMap map = mCameraCharacteristics.get(CameraCharacteristics
+                .SCALER_STREAM_CONFIGURATION_MAP);
+        Size[] previewSizeChoices = map.getOutputSizes(SurfaceTexture.class);
+        if (width == 0 || height == 0) {
+            width = 1280;
+            height = 720;
+        }
+        Size imageSize = CameraUtils.chooseVideoSize(previewSizeChoices, width, height, width);
+
+        mImageReader = ImageReader.newInstance(imageSize.getWidth(), imageSize.getHeight(),
+                ImageFormat.JPEG, 3);
+        // Because saving images is done on the main UI thread, the handler is set null.
+        // If the handler is not null say mBackgroundHandler, when onPause() is called,
+        // the handler will be torn down, The IllegalStateException:
+        // sending message to a Handler on a dead thread, will be thrown out.
+        mImageReader.setOnImageAvailableListener(
+                ((CameraCaptureActivity) mActivity).mImageAvailableListener, null);
+
+        Timber.d("Image reader size w: %d, h: %d",mImageReader.getWidth(),
+                mImageReader.getHeight());
+    }
 
     private class NumExpoIso {
         public Long mNumber;
@@ -284,7 +321,7 @@ public class Camera2Proxy {
         Timber.d("ISO set to %d", desiredIso);
     }
 
-    private void initPreviewRequest() {
+    private void initPreviewRequest(boolean previewForSnapshot) {
         try {
             mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
 
@@ -305,13 +342,22 @@ public class Camera2Proxy {
 //                    CaptureRequest.LENS_FOCUS_DISTANCE, minFocusDistance);
 //            Timber.d("Focus distance set to its min value %f", minFocusDistance);
 
+            List surfaces = new ArrayList<>();
+            if (previewForSnapshot) {
+                Surface readerSurface = mImageReader.getSurface();
+                surfaces.add(readerSurface);
+                mPreviewRequestBuilder.addTarget(readerSurface);
+            }
+
             if (mPreviewSurfaceTexture != null && mPreviewSurface == null) { // use texture view
                 mPreviewSurfaceTexture.setDefaultBufferSize(mPreviewSize.getWidth(),
                         mPreviewSize.getHeight());
                 mPreviewSurface = new Surface(mPreviewSurfaceTexture);
             }
+            surfaces.add(mPreviewSurface);
             mPreviewRequestBuilder.addTarget(mPreviewSurface);
-            mCameraDevice.createCaptureSession(Arrays.asList(mPreviewSurface),
+
+            mCameraDevice.createCaptureSession(surfaces,
                     new CameraCaptureSession.StateCallback() {
 
                         @Override

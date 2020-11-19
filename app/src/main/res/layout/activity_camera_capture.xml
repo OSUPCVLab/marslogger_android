@@ -35,12 +35,21 @@
             android:onClick="clickToggleRecording"
             android:text="@string/toggleRecordingOn"/>
 
-        <Spinner
-            android:id="@+id/cameraFilter_spinner"
+        <Button
+            android:id="@+id/snapshot_button"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="2"
-            android:layout_marginStart="@dimen/activity_horizontal_margin"/>
+            android:layout_weight="1"
+            android:layout_marginStart="@dimen/activity_horizontal_margin"
+            android:onClick="clickSnapshot"
+            android:text="@string/snapshot"/>
+
+<!--        <Spinner-->
+<!--            android:id="@+id/cameraFilter_spinner"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_weight="2"-->
+<!--            android:layout_marginStart="@dimen/activity_horizontal_margin"/>-->
 
         <ImageButton
             android:id="@+id/info_button"
@@ -107,5 +116,23 @@
         android:layout_toEndOf="@id/cameraOutputDirLabel"
         android:paddingStart="4dp"
         android:text="@string/cameraOutputDir_text" />
+
+    <TextView
+        android:id="@+id/numSnapshotLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@id/cameraParams_text"
+        android:layout_below="@id/cameraOutputDirLabel"
+        android:text="@string/numSnapshotLabel" />
+
+    <TextView
+        android:id="@+id/numSnapshot_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/numSnapshotLabel"
+        android:layout_alignBottom="@id/numSnapshotLabel"
+        android:layout_toEndOf="@id/numSnapshotLabel"
+        android:paddingStart="4dp"
+        android:text="@string/numSnapshotText" />
 
 </RelativeLayout>
