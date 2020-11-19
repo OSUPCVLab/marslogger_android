@@ -79,7 +79,7 @@ public class Camera2Proxy {
 
     private FocalLengthHelper mFocalLengthHelper = new FocalLengthHelper();
 
-    public boolean mSupportSnapshot = true; // Previewing both video frames and image frames slows down video frame rate.
+    public boolean mSupportSnapshot = false; // Previewing both video frames and image frames slows down video frame rate.
 
     private CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
         @Override
@@ -196,14 +196,16 @@ public class Camera2Proxy {
     }
 
     @SuppressLint("MissingPermission")
-    public void openCamera(int width, int height) {
+    public void openCamera(int width, int height, boolean supportSnapshot) {
         Timber.v("openCamera");
         startBackgroundThread();
         mOrientationEventListener.enable();
         if (mCameraIdStr.isEmpty()) {
             configureCamera(width, height);
         }
-        initImageReader(width, height);
+        if (supportSnapshot)
+            initImageReader(width, height);
+        mSupportSnapshot = supportSnapshot;
         try {
             mCameraManager.openCamera(mCameraIdStr, mStateCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
@@ -257,7 +259,7 @@ public class Camera2Proxy {
         // the handler will be torn down, The IllegalStateException:
         // sending message to a Handler on a dead thread, will be thrown out.
         mImageReader.setOnImageAvailableListener(
-                ((CameraCaptureActivity) mActivity).mImageAvailableListener, null);
+                ((PhotoCaptureActivity) mActivity).mImageAvailableListener, null);
 
         Timber.d("Image reader size w: %d, h: %d",mImageReader.getWidth(),
                 mImageReader.getHeight());
@@ -279,7 +281,7 @@ public class Camera2Proxy {
     private ArrayList<NumExpoIso> expoStats = new ArrayList<>(kMaxExpoSamples);
 
     private void setExposureAndIso() {
-        Long exposureNanos = CameraCaptureActivity.mDesiredExposureTime;
+        Long exposureNanos = DesiredCameraSetting.mDesiredExposureTime;
         Long desiredIsoL = 30L * 30000000L / exposureNanos;
         Integer desiredIso = desiredIsoL.intValue();
         if (!expoStats.isEmpty()) {
@@ -429,7 +431,7 @@ public class Camera2Proxy {
                             Timber.e(err, "Error writing captureResult");
                         }
                     }
-                    ((CameraCaptureActivity) mActivity).updateCaptureResultPanel(
+                    ((CameraCaptureActivityBase) mActivity).updateCaptureResultPanel(
                             sz_focal_length.getWidth(), exposureTimeNs, afMode);
                 }
 

@@ -21,8 +21,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraMetadata;
-import android.media.Image;
-import android.media.ImageReader;
+
 import android.opengl.EGL14;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
@@ -31,7 +30,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.support.annotation.NonNull;
+
 import android.support.annotation.RequiresApi;
 import android.util.Size;
 import android.view.Display;
@@ -44,7 +43,6 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -134,22 +132,16 @@ import timber.log.Timber;
  * is managed as a static property of the Activity.
  */
 
-/**
- * Dependency relations between the key components:
- * CameraSurfaceRenderer onSurfaceCreated depends on mCameraHandler, and eventually mCamera2Proxy
- * mCamera2Proxy initialization depends on onRequestPermissionsResult
- *
- * The order of calls in requesting permission inside onCreate()
- * activity.onCreate() -> requestCameraPermission()
- * activity.onResume()
- * activity.onPause()
- * activity.onRequestPermissionsResult()
- * activity.onResume()
-*/
-public class CameraCaptureActivity extends Activity
-        implements SurfaceTexture.OnFrameAvailableListener, OnItemSelectedListener {
+class DesiredCameraSetting {
+    static final int mDesiredFrameWidth = 1280;
+    static final int mDesiredFrameHeight = 720;
+    static final Long mDesiredExposureTime = 5000000L; // nanoseconds
+}
+
+
+class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFrameAvailableListener {
     public static final String TAG = "MarsLogger";
-    private static final boolean VERBOSE = false;
+    protected static final boolean VERBOSE = false;
 
     // Camera filters; must match up with cameraFilterNames in strings.xml
     static final int FILTER_NONE = 0;
@@ -159,39 +151,39 @@ public class CameraCaptureActivity extends Activity
     static final int FILTER_EDGE_DETECT = 4;
     static final int FILTER_EMBOSS = 5;
 
-    static final int mDesiredFrameWidth = 1280;
-    static final int mDesiredFrameHeight = 720;
-    static final Long mDesiredExposureTime = 5000000L; // nanoseconds
+    protected TextView mKeyCameraParamsText;
+    protected TextView mCaptureResultText;
 
-    private SampleGLView mGLView;
-    private CameraSurfaceRenderer mRenderer;
+    protected int mCameraPreviewWidth, mCameraPreviewHeight;
+    static boolean mSnapshotMode = false;
+    protected Camera2Proxy mCamera2Proxy = null;
 
-    private TextView mKeyCameraParamsText;
-    private TextView mCaptureResultText;
-    private TextView mOutputDirText;
-    private String mSnapshotOutputDir = null;
-    private boolean mSnap = false;
-    private int mSnapNumber = 0;
+    protected SampleGLView mGLView;
+    protected TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
 
-    private Camera2Proxy mCamera2Proxy = null;
-    private CameraHandler mCameraHandler;
-    private boolean mRecordingEnabled;      // controls button state
+    /**
+     * Connects the SurfaceTexture to the Camera preview output, and starts the preview.
+     */
+    public void handleSetSurfaceTexture(SurfaceTexture st) {
+        st.setOnFrameAvailableListener(this);
 
-    private int mCameraPreviewWidth, mCameraPreviewHeight;
-
-    private TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
-    private IMUManager mImuManager;
-    private TimeBaseManager mTimeBaseManager;
-
+        if (mCamera2Proxy != null) {
+            mCamera2Proxy.setPreviewSurfaceTexture(st);
+            mCamera2Proxy.openCamera(0, 0, mSnapshotMode);
+        } else {
+            throw new RuntimeException(
+                    "Try to set surface texture while camera2proxy is null");
+        }
+    }
     public Camera2Proxy getmCamera2Proxy() {
         if (mCamera2Proxy == null) {
             throw new RuntimeException(
-                "Get a null Camera2Proxy");
+                    "Get a null Camera2Proxy");
         }
         return mCamera2Proxy;
     }
 
-    private String renewOutputDir() {
+    protected String renewOutputDir() {
         SimpleDateFormat dateFormat =
                 new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss");
         String folderName = dateFormat.format(new Date());
@@ -214,6 +206,98 @@ public class CameraCaptureActivity extends Activity
         return outputDir;
     }
 
+    // updates mCameraPreviewWidth/Height
+    protected void setLayoutAspectRatio(Size cameraPreviewSize) {
+        AspectFrameLayout layout = findViewById(R.id.cameraPreview_afl);
+        Display display = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
+        mCameraPreviewWidth = cameraPreviewSize.getWidth();
+        mCameraPreviewHeight = cameraPreviewSize.getHeight();
+        if (display.getRotation() == Surface.ROTATION_0) {
+            layout.setAspectRatio((double) mCameraPreviewHeight / mCameraPreviewWidth);
+        } else if (display.getRotation() == Surface.ROTATION_180) {
+            layout.setAspectRatio((double) mCameraPreviewHeight / mCameraPreviewWidth);
+        } else {
+            layout.setAspectRatio((double) mCameraPreviewWidth / mCameraPreviewHeight);
+        }
+    }
+
+    public void updateCaptureResultPanel(
+            final Float fl,
+            final Long exposureTimeNs, final Integer afMode) {
+        final String sfl = String.format(Locale.getDefault(), "%.3f", fl);
+        final String sexpotime =
+                exposureTimeNs == null ?
+                        "null ms" :
+                        String.format(Locale.getDefault(), "%.2f ms",
+                                exposureTimeNs / 1000000.0);
+        String safMode;
+        switch (afMode) {
+            case CameraMetadata.CONTROL_AF_MODE_OFF:
+                safMode = "AF locked";
+                break;
+            default:
+                safMode = "AF unlocked";
+                break;
+        }
+        final String saf = safMode;
+        runOnUiThread(new Runnable() {
+
+            @Override
+            public void run() {
+                mCaptureResultText.setText(sfl + " " + sexpotime + " " + saf);
+            }
+        });
+    }
+
+    @Override
+    public void onFrameAvailable(SurfaceTexture st) {
+        // The SurfaceTexture uses this to signal the availability of a new frame.  The
+        // thread that "owns" the external texture associated with the SurfaceTexture (which,
+        // by virtue of the context being shared, *should* be either one) needs to call
+        // updateTexImage() to latch the buffer.
+        //
+        // Once the buffer is latched, the GLSurfaceView thread can signal the encoder thread.
+        // This feels backward -- we want recording to be prioritized over rendering -- but
+        // since recording is only enabled some of the time it's easier to do it this way.
+        //
+        // Since GLSurfaceView doesn't establish a Looper, this will *probably* execute on
+        // the main UI thread.  Fortunately, requestRender() can be called from any thread,
+        // so it doesn't really matter.
+        if (VERBOSE) Timber.d("ST onFrameAvailable");
+        mGLView.requestRender();
+
+        final String sfps = String.format(Locale.getDefault(), "%.1f FPS",
+                sVideoEncoder.mFrameRate);
+        String previewFacts = mCameraPreviewWidth + "x" + mCameraPreviewHeight + "@" + sfps;
+
+        mKeyCameraParamsText.setText(previewFacts);
+    }
+}
+
+/**
+ * Dependency relations between the key components:
+ * CameraSurfaceRenderer onSurfaceCreated depends on mCameraHandler, and eventually mCamera2Proxy
+ * mCamera2Proxy initialization depends on onRequestPermissionsResult
+ *
+ * The order of calls in requesting permission inside onCreate()
+ * activity.onCreate() -> requestCameraPermission()
+ * activity.onResume()
+ * activity.onPause()
+ * activity.onRequestPermissionsResult()
+ * activity.onResume()
+*/
+public class CameraCaptureActivity extends CameraCaptureActivityBase
+        implements OnItemSelectedListener {
+    private CameraSurfaceRenderer mRenderer;
+    private TextView mOutputDirText;
+
+    private CameraHandler mCameraHandler;
+    private boolean mRecordingEnabled;      // controls button state
+
+
+    private IMUManager mImuManager;
+    private TimeBaseManager mTimeBaseManager;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -221,24 +305,30 @@ public class CameraCaptureActivity extends Activity
         // https://stackoverflow.com/questions/47228194/android-8-1-screen-orientation-issue-flipping-to-landscape-a-portrait-screen
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         setContentView(R.layout.activity_camera_capture);
+        mSnapshotMode = false;
+        Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.cameraFilterNames, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Apply the adapter to the spinner.
+        spinner.setAdapter(adapter);
+        spinner.setOnItemSelectedListener(this);
+    }
 
-//        Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
-//        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
-//                R.array.cameraFilterNames, android.R.layout.simple_spinner_item);
-//        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-//        // Apply the adapter to the spinner.
-//        spinner.setAdapter(adapter);
-//        spinner.setOnItemSelectedListener(this);
-
+    @Override
+    protected void onStart() {
+        super.onStart();
         mCamera2Proxy = new Camera2Proxy(this);
         Size previewSize =
-                mCamera2Proxy.configureCamera(mDesiredFrameWidth, mDesiredFrameHeight);
+                mCamera2Proxy.configureCamera(
+                        DesiredCameraSetting.mDesiredFrameWidth,
+                        DesiredCameraSetting.mDesiredFrameHeight);
         setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
 
         // Define a handler that receives camera-control messages from other threads.  All calls
         // to Camera must be made on the same thread.  Note we create this before the renderer
         // thread, so we know the fully-constructed object will be visible.
-        mCameraHandler = new CameraHandler(this);
+        mCameraHandler = new CameraHandler(this, false);
 
         mRecordingEnabled = sVideoEncoder.isRecording();
 
@@ -266,20 +356,7 @@ public class CameraCaptureActivity extends Activity
         mOutputDirText = (TextView) findViewById(R.id.cameraOutputDir_text);
     }
 
-    // updates mCameraPreviewWidth/Height
-    private void setLayoutAspectRatio(Size cameraPreviewSize) {
-        AspectFrameLayout layout = findViewById(R.id.cameraPreview_afl);
-        Display display = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
-        mCameraPreviewWidth = cameraPreviewSize.getWidth();
-        mCameraPreviewHeight = cameraPreviewSize.getHeight();
-        if (display.getRotation() == Surface.ROTATION_0) {
-            layout.setAspectRatio((double) mCameraPreviewHeight / mCameraPreviewWidth);
-        } else if (display.getRotation() == Surface.ROTATION_180) {
-            layout.setAspectRatio((double) mCameraPreviewHeight / mCameraPreviewWidth);
-        } else {
-            layout.setAspectRatio((double) mCameraPreviewWidth / mCameraPreviewHeight);
-        }
-    }
+
 
     @Override
     protected void onResume() {
@@ -292,7 +369,9 @@ public class CameraCaptureActivity extends Activity
         if (mCamera2Proxy == null) {
             mCamera2Proxy = new Camera2Proxy(this);
             Size previewSize =
-                    mCamera2Proxy.configureCamera(mDesiredFrameWidth, mDesiredFrameHeight);
+                    mCamera2Proxy.configureCamera(
+                            DesiredCameraSetting.mDesiredFrameWidth,
+                            DesiredCameraSetting.mDesiredFrameHeight);
             setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
         }
 
@@ -315,9 +394,6 @@ public class CameraCaptureActivity extends Activity
             mCamera2Proxy.releaseCamera();
             mCamera2Proxy = null;
         }
-        mSnapshotOutputDir = null;
-        mSnap = false;
-        mSnapNumber = 0;
 
         mGLView.queueEvent(new Runnable() {
             @Override
@@ -391,49 +467,6 @@ public class CameraCaptureActivity extends Activity
         updateControls();
     }
 
-    public void clickSnapshot(@SuppressWarnings("unused") View unused) {
-        if (mRecordingEnabled) {
-            return;
-        }
-        if (mSnapshotOutputDir != null) {
-            mCamera2Proxy.resumeRecordingCaptureResult();
-            mSnap = true;
-        } else {
-            mSnapshotOutputDir = renewOutputDir();
-            String basename = mSnapshotOutputDir.substring(mSnapshotOutputDir.lastIndexOf("/") + 1);
-            mOutputDirText.setText(basename);
-            mSnapNumber = 0;
-            mCamera2Proxy.startRecordingCaptureResult(
-                    mSnapshotOutputDir + File.separator + "movie_metadata.csv");
-            mSnap = true;
-        }
-        TextView numSnapshotView = (TextView) findViewById(R.id.numSnapshot_text);
-        numSnapshotView.setText(String.valueOf(mSnapNumber + 1));
-    }
-
-//    https://github.com/almalence/OpenCamera/blob/master/src/com/almalence/opencam/cameracontroller/Camera2Controller.java#L3455
-//    https://stackoverflow.com/questions/34664131/camera2-imagereader-freezes-repeating-capture-request
-    public final ImageReader.OnImageAvailableListener mImageAvailableListener =
-            new ImageReader.OnImageAvailableListener() {
-                @Override
-                public void onImageAvailable(ImageReader ir) {
-                    if (mSnap) {
-                        Image image = ir.acquireNextImage();
-                        Long timestamp = image.getTimestamp();
-                        String outputFile = mSnapshotOutputDir + File.separator + timestamp.toString() + ".jpg";
-                        File dest = new File(outputFile);
-                        Timber.d("Saving image to %s", outputFile);
-                        new ImageSaver(image, dest).run();
-                        mSnap = false;
-                        ++mSnapNumber;
-                        mCamera2Proxy.pauseRecordingCaptureResult();
-                    } else {
-                        Image image = ir.acquireLatestImage();
-                        image.close();
-                    }
-                }
-            };
-
 //    /**
 //     * onClick handler for "rebind" checkbox.
 //     */
@@ -442,42 +475,6 @@ public class CameraCaptureActivity extends Activity
 //        TextureRender.sWorkAroundContextProblem = cb.isChecked();
 //    }
 
-    /**
-     * Display the info fragment
-     * @param unused
-     */
-    public void clickInfo(@SuppressWarnings("unused") View unused) {
-        Intent infoIntent = new Intent(this, InfoActivity.class);
-        startActivity(infoIntent);
-    }
-
-    public void updateCaptureResultPanel(
-            final Float fl,
-            final Long exposureTimeNs, final Integer afMode) {
-        final String sfl = String.format(Locale.getDefault(), "%.3f", fl);
-        final String sexpotime =
-                exposureTimeNs == null ?
-                        "null ms" :
-                        String.format(Locale.getDefault(), "%.2f ms",
-                                exposureTimeNs / 1000000.0);
-        String safMode;
-        switch (afMode) {
-            case CameraMetadata.CONTROL_AF_MODE_OFF:
-                safMode = "AF locked";
-                break;
-            default:
-                safMode = "AF unlocked";
-                break;
-        }
-        final String saf = safMode;
-        runOnUiThread(new Runnable() {
-
-            @Override
-            public void run() {
-                mCaptureResultText.setText(sfl + " " + sexpotime + " " + saf);
-            }
-        });
-    }
 
     /**
      * Updates the on-screen controls to reflect the current state of the app.
@@ -492,100 +489,65 @@ public class CameraCaptureActivity extends Activity
         //cb.setChecked(TextureRender.sWorkAroundContextProblem);
     }
 
-    /**
-     * Connects the SurfaceTexture to the Camera preview output, and starts the preview.
-     */
-    private void handleSetSurfaceTexture(SurfaceTexture st) {
-        st.setOnFrameAvailableListener(this);
+}
 
-        if (mCamera2Proxy != null) {
-            mCamera2Proxy.setPreviewSurfaceTexture(st);
-            mCamera2Proxy.openCamera(0, 0);
-        } else {
-            throw new RuntimeException(
-                    "Try to set surface texture while camera2proxy is null");
-        }
-    }
 
-    @Override
-    public void onFrameAvailable(SurfaceTexture st) {
-        // The SurfaceTexture uses this to signal the availability of a new frame.  The
-        // thread that "owns" the external texture associated with the SurfaceTexture (which,
-        // by virtue of the context being shared, *should* be either one) needs to call
-        // updateTexImage() to latch the buffer.
-        //
-        // Once the buffer is latched, the GLSurfaceView thread can signal the encoder thread.
-        // This feels backward -- we want recording to be prioritized over rendering -- but
-        // since recording is only enabled some of the time it's easier to do it this way.
-        //
-        // Since GLSurfaceView doesn't establish a Looper, this will *probably* execute on
-        // the main UI thread.  Fortunately, requestRender() can be called from any thread,
-        // so it doesn't really matter.
-        if (VERBOSE) Timber.d("ST onFrameAvailable");
-        mGLView.requestRender();
+/**
+ * Handles camera operation requests from other threads.  Necessary because the Camera
+ * must only be accessed from one thread.
+ * <p>
+ * The object is created on the UI thread, and all handlers run there.  Messages are
+ * sent from other threads, using sendMessage().
+ */
+class CameraHandler extends Handler {
+    public static final int MSG_SET_SURFACE_TEXTURE = 0;
+    public static final int MSG_MANUAL_FOCUS = 1;
 
-        final String sfps = String.format(Locale.getDefault(), "%.1f FPS",
-                sVideoEncoder.mFrameRate);
-        String previewFacts = mCameraPreviewWidth + "x" + mCameraPreviewHeight + "@" + sfps;
+    // Weak reference to the Activity; only access this from the UI thread.
+    private WeakReference<Activity> mWeakActivity;
+    private boolean mSnapshot;
 
-        mKeyCameraParamsText.setText(previewFacts);
+    public CameraHandler(Activity activity, boolean snapshot) {
+        mWeakActivity = new WeakReference<Activity>(activity);
+        mSnapshot = snapshot;
     }
 
     /**
-     * Handles camera operation requests from other threads.  Necessary because the Camera
-     * must only be accessed from one thread.
-     * <p>
-     * The object is created on the UI thread, and all handlers run there.  Messages are
-     * sent from other threads, using sendMessage().
+     * Drop the reference to the activity.  Useful as a paranoid measure to ensure that
+     * attempts to access a stale Activity through a handler are caught.
      */
-    static class CameraHandler extends Handler {
-        public static final int MSG_SET_SURFACE_TEXTURE = 0;
-        public static final int MSG_MANUAL_FOCUS = 1;
+    public void invalidateHandler() {
+        mWeakActivity.clear();
+    }
 
-        // Weak reference to the Activity; only access this from the UI thread.
-        private WeakReference<CameraCaptureActivity> mWeakActivity;
 
-        public CameraHandler(CameraCaptureActivity activity) {
-            mWeakActivity = new WeakReference<CameraCaptureActivity>(activity);
+    @Override  // runs on UI thread
+    public void handleMessage(Message inputMessage) {
+        int what = inputMessage.what;
+        Object obj = inputMessage.obj;
+
+        Timber.d("CameraHandler [%s]: what=%d", this.toString(), what);
+
+        Activity activity = mWeakActivity.get();
+        if (activity == null) {
+            Timber.w("CameraHandler.handleMessage: activity is null");
+            return;
         }
 
-        /**
-         * Drop the reference to the activity.  Useful as a paranoid measure to ensure that
-         * attempts to access a stale Activity through a handler are caught.
-         */
-        public void invalidateHandler() {
-            mWeakActivity.clear();
-        }
-
-
-        @Override  // runs on UI thread
-        public void handleMessage(Message inputMessage) {
-            int what = inputMessage.what;
-            Object obj = inputMessage.obj;
-
-            Timber.d("CameraHandler [%s]: what=%d", this.toString(), what);
-
-            CameraCaptureActivity activity = mWeakActivity.get();
-            if (activity == null) {
-                Timber.w("CameraHandler.handleMessage: activity is null");
-                return;
-            }
-
-            switch (what) {
-                case MSG_SET_SURFACE_TEXTURE:
-                    activity.handleSetSurfaceTexture((SurfaceTexture) inputMessage.obj);
-                    break;
-                case MSG_MANUAL_FOCUS:
-                    Camera2Proxy camera2proxy = activity.getmCamera2Proxy();
-                    camera2proxy.changeManualFocusPoint((ManualFocusConfig)obj);
-                    break;
-                default:
-                    throw new RuntimeException("unknown msg " + what);
-            }
+        switch (what) {
+            case MSG_SET_SURFACE_TEXTURE:
+                ((CameraCaptureActivityBase) activity).handleSetSurfaceTexture(
+                        (SurfaceTexture) inputMessage.obj);
+                break;
+            case MSG_MANUAL_FOCUS:
+                Camera2Proxy camera2proxy = ((CameraCaptureActivityBase) activity).getmCamera2Proxy();
+                camera2proxy.changeManualFocusPoint((ManualFocusConfig) obj);
+                break;
+            default:
+                throw new RuntimeException("unknown msg " + what);
         }
     }
 }
-
 /**
  * Renderer object for our GLSurfaceView.
  * <p>
@@ -600,7 +562,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
     private static final int RECORDING_ON = 1;
     private static final int RECORDING_RESUMED = 2;
 
-    private CameraCaptureActivity.CameraHandler mCameraHandler;
+    private CameraHandler mCameraHandler;
     private TextureMovieEncoder mVideoEncoder;
     private String mOutputFile;
     private String mMetadataFile;
@@ -631,7 +593,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      * @param cameraHandler Handler for communicating with UI thread
      * @param movieEncoder  video encoder object
      */
-    public CameraSurfaceRenderer(CameraCaptureActivity.CameraHandler cameraHandler,
+    public CameraSurfaceRenderer(CameraHandler cameraHandler,
                                  TextureMovieEncoder movieEncoder) {
         mCameraHandler = cameraHandler;
         mVideoEncoder = movieEncoder;
@@ -797,7 +759,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
         // Tell the UI thread to enable the camera preview.
         mCameraHandler.sendMessage(mCameraHandler.obtainMessage(
-                CameraCaptureActivity.CameraHandler.MSG_SET_SURFACE_TEXTURE, mSurfaceTexture));
+                CameraHandler.MSG_SET_SURFACE_TEXTURE, mSurfaceTexture));
     }
 
     @Override
@@ -829,10 +791,10 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                     mVideoEncoder.startRecording(
                             new TextureMovieEncoder.EncoderConfig(
                                     mOutputFile,
-                                    CameraCaptureActivity.mDesiredFrameHeight,
-                                    CameraCaptureActivity.mDesiredFrameWidth,
-                                    CameraUtils.calcBitRate(CameraCaptureActivity.mDesiredFrameWidth,
-                                            CameraCaptureActivity.mDesiredFrameHeight,
+                                    DesiredCameraSetting.mDesiredFrameHeight,
+                                    DesiredCameraSetting.mDesiredFrameWidth,
+                                    CameraUtils.calcBitRate(DesiredCameraSetting.mDesiredFrameWidth,
+                                            DesiredCameraSetting.mDesiredFrameHeight,
                                             VideoEncoderCore.FRAME_RATE),
                                     EGL14.eglGetCurrentContext(),
                                     mMetadataFile));

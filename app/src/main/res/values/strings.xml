@@ -46,4 +46,9 @@
     <string name="eula_refuse">Decline</string>
 
     <string name="link_foreword">The source code for the app is at</string>
+    <string name="title_activity_nav">Navigation</string>
+    <string name="title_video">Video</string>
+    <string name="title_photo">Photo</string>
+    <string name="title_about">About</string>
+    <string name="title_activity_photo_capture">PhotoCapture</string>
 </resources>
