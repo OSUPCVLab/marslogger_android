@@ -45,9 +45,7 @@ import timber.log.Timber;
  */
 public class PhotoCaptureActivity extends CameraCaptureActivityBase
         implements AdapterView.OnItemSelectedListener {
-
-    private CameraSurfaceRenderer mRenderer;
-
+    private CameraSurfaceRenderer mRenderer = null;
     private TextView mOutputDirText;
 
     private String mSnapshotOutputDir = null;
@@ -88,10 +86,12 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
         // appropriate EGL context.
         mGLView = (SampleGLView) findViewById(R.id.cameraPreview_surfaceView);
         mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
-        mRenderer = new CameraSurfaceRenderer(
-                mCameraHandler, sVideoEncoder);
-        mGLView.setRenderer(mRenderer);
-        mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        if (mRenderer == null) {
+            mRenderer = new CameraSurfaceRenderer(
+                    mCameraHandler, sVideoEncoder);
+            mGLView.setRenderer(mRenderer);
+            mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        }
         mGLView.setTouchListener((event, width, height) -> {
             ManualFocusConfig focusConfig =
                     new ManualFocusConfig(event.getX(), event.getY(), width, height);

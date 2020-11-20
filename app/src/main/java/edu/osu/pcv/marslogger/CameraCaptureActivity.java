@@ -288,12 +288,11 @@ class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFra
 */
 public class CameraCaptureActivity extends CameraCaptureActivityBase
         implements OnItemSelectedListener {
-    private CameraSurfaceRenderer mRenderer;
+    private CameraSurfaceRenderer mRenderer = null;
     private TextView mOutputDirText;
 
     private CameraHandler mCameraHandler;
     private boolean mRecordingEnabled;      // controls button state
-
 
     private IMUManager mImuManager;
     private TimeBaseManager mTimeBaseManager;
@@ -336,10 +335,12 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         // appropriate EGL context.
         mGLView = (SampleGLView) findViewById(R.id.cameraPreview_surfaceView);
         mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
-        mRenderer = new CameraSurfaceRenderer(
-                mCameraHandler, sVideoEncoder);
-        mGLView.setRenderer(mRenderer);
-        mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        if (mRenderer == null) {
+            mRenderer = new CameraSurfaceRenderer(
+                    mCameraHandler, sVideoEncoder);
+            mGLView.setRenderer(mRenderer);
+            mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        }
         mGLView.setTouchListener((event, width, height) -> {
             ManualFocusConfig focusConfig =
                     new ManualFocusConfig(event.getX(), event.getY(), width, height);
