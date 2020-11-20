@@ -12,6 +12,11 @@
         android:title="@string/title_photo" />
 
     <item
+        android:id="@+id/navigation_imuviewer"
+        android:icon="@drawable/ic_3d_rotation_24px"
+        android:title="@string/title_imuviewer" />
+
+    <item
         android:id="@+id/navigation_about"
         android:icon="@drawable/ic_notifications_black_24dp"
         android:title="@string/title_about" />

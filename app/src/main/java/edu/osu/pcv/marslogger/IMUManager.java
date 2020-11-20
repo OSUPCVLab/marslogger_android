@@ -26,7 +26,7 @@ public class IMUManager implements SensorEventListener {
     // [t-x, t+x] of the gyro data at t, then the original acceleration data
     // is used instead of linear interpolation
     private final long mInterpolationTimeResolution = 500; // nanoseconds
-    private final int mSensorRate = SensorManager.SENSOR_DELAY_GAME;
+    private final int mSensorRate = SensorManager.SENSOR_DELAY_FASTEST;
 
     private class SensorPacket {
         long timestamp;

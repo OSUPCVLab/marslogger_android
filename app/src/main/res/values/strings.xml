@@ -23,6 +23,8 @@
     <string name="cameraOutputDir_text">[dir name]</string>
     <string name="toggleRecordingOn">Record</string>
     <string name="toggleRecordingOff">Stop</string>
+    <string name="toggleImuViewOn">Start</string>
+    <string name="toggleImuViewOff">Stop</string>
     <string name="snapshot">Snapshot</string>
     <string name="numSnapshotLabel">#Snapshot</string>
     <string name="numSnapshotText">0</string>
@@ -50,5 +52,6 @@
     <string name="title_video">Video</string>
     <string name="title_photo">Photo</string>
     <string name="title_about">About</string>
+    <string name="title_imuviewer">IMU</string>
     <string name="title_activity_photo_capture">PhotoCapture</string>
 </resources>

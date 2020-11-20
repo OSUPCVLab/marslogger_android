@@ -7,5 +7,6 @@
     <dimen name="activity_bottom_margin">4dp</dimen>
     <dimen name="button_height">38dp</dimen>
     <dimen name="fab_margin">16dp</dimen>
+    <dimen name="text_margin">8dp</dimen>
 
 </resources>

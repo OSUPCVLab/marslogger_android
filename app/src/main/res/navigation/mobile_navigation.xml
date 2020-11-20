@@ -17,9 +17,16 @@
         android:label="@string/title_photo"
         tools:layout="@layout/activity_photo_capture" />
 
+    <fragment
+        android:id="@+id/navigation_imuviewer"
+        android:name="edu.osu.pcv.marslogger.ImuViewFragment"
+        android:label="@string/title_imuviewer"
+        tools:layout="@layout/fragment_imu" />
+
     <activity
         android:id="@+id/navigation_about"
         android:name="edu.osu.pcv.marslogger.InfoActivity"
         android:label="@string/title_about"
         tools:layout="@layout/activity_info" />
+
 </navigation>

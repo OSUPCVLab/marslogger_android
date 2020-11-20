@@ -30,6 +30,7 @@
         <activity
             android:name=".NavActivity"
             android:label="@string/title_activity_nav"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat"></activity>
         <activity android:name=".MainActivity">
             <intent-filter>
