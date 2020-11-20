@@ -303,7 +303,7 @@ public class Camera2Proxy {
             } // else may occur on an emulated device.
         }
 
-        boolean manualControl = true;
+        boolean manualControl = mSharedPreferences.getBoolean("switchManualControl", false);
         if (manualControl) {
             float exposureTimeMs = (float) exposureNanos / 1e6f;
             String exposureTimeMsStr = mSharedPreferences.getString(
@@ -312,6 +312,7 @@ public class Camera2Proxy {
             String desiredIsoStr = mSharedPreferences.getString("prefISO", String.valueOf(desiredIso));
             desiredIso = Integer.parseInt(desiredIsoStr);
         }
+
         // fix exposure
         mPreviewRequestBuilder.set(
                 CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
