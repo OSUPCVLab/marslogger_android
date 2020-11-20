@@ -1,16 +1,29 @@
 package edu.osu.pcv.marslogger;
 
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.BottomNavigationView;
+
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
+
 import android.support.v7.app.AppCompatActivity;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
-public class NavActivity extends AppCompatActivity implements ImuViewFragment.OnListFragmentInteractionListener {
+import timber.log.Timber;
 
+public class NavActivity extends AppCompatActivity implements
+        ImuViewFragment.OnListFragmentInteractionListener,
+        SettingsFragment.OnFragmentInteractionListener
+{
+    private static final int RESULT_SETTINGS = 1;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -27,8 +40,41 @@ public class NavActivity extends AppCompatActivity implements ImuViewFragment.On
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.settings_menu, menu);
+        return true;
+    }
+
+    @Override
     public void onListFragmentInteraction(ImuViewContent.SingleAxis item) {
         // The user selected an item from the ImuViewFragment
         // Do something here to display that item
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle item selection
+        switch (item.getItemId()) {
+            case R.id.settings_option:
+                Timber.d("Start settings");
+                FragmentManager manager = getSupportFragmentManager();
+                FragmentTransaction transaction = manager.beginTransaction();
+                SettingsFragment fragment = new SettingsFragment();
+                transaction.replace(R.id.nav_host_fragment, fragment);
+                transaction.addToBackStack(null);
+                transaction.commit();
+                return true;
+            case R.id.help_option:
+                Timber.d("Show help");
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
+
+    @Override
+    public void onFragmentInteraction(Uri uri) {
+
     }
 }

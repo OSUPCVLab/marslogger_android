@@ -28,7 +28,7 @@
     <string name="snapshot">Snapshot</string>
     <string name="numSnapshotLabel">#Snapshot</string>
     <string name="numSnapshotText">0</string>
-
+    <string name="camera_error">This device doesn\'t support Camera2 API.</string>
     <!-- for cameraFilter_spinner; match with CameraCaptureActivity constants -->
     <string-array name="cameraFilterNames">
         <item>Normal</item>
