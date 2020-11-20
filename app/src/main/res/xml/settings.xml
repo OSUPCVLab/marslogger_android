@@ -7,6 +7,23 @@
         <!--android:summary="@string/pref_user_name_summary"-->
         <!--android:key="prefUsername"/>-->
 
+        <CheckBoxPreference
+            android:key="prefManualControl"
+            android:title="Control camera manually?"
+            android:summary="Uncheck to use computed values" />
+
+        <EditTextPreference
+            android:key="prefISO"
+            android:title="Adjust ISO"
+            android:summary="Lock ISO to the custom value"
+            android:dialogTitle="Adjust ISO dialog" />
+
+        <EditTextPreference
+            android:key="prefExposureTime"
+            android:title="Adjust exposure time"
+            android:summary="Lock exposure time to custom value"
+            android:dialogTitle="Adjust exposure time dialog" />
+
         <ListPreference
             android:key="prefCamera"
             android:title="Live Camera"
@@ -17,25 +34,12 @@
             android:title="Raw Image Size"
             android:summary="Set the incoming image size" />
 
-        <!--<ListPreference-->
-        <!--android:key="prefSizeResize"-->
-        <!--android:title="Re-sized Image"-->
-        <!--android:summary="Set what the image should be resized to"-->
-        <!--android:entries="@array/imageResize"-->
-        <!--android:entryValues="@array/imageResizeValues"-->
-        <!--android:defaultValue="0x0" />-->
-
-        <!--<Preference-->
-        <!--android:key="filePicker"-->
-        <!--android:title="Export Folder"-->
-        <!--android:summary="Pick where the calibration files should export to" />-->
-
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Additional Sensors" >
 
         <ListPreference
-            android:key="perfImuFreq"
+            android:key="prefImuFreq"
             android:title="IMU Frequency"
             android:summary="Frequency the IMU should collect at"
             android:entries="@array/imuFreq"

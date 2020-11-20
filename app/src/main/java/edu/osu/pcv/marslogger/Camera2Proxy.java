@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
@@ -23,7 +24,9 @@ import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
+import android.support.v7.preference.CheckBoxPreference;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -47,7 +50,7 @@ public class Camera2Proxy {
     private static final String TAG = "Camera2Proxy";
 
     private Activity mActivity;
-
+    private static SharedPreferences mSharedPreferences;
     private int mCameraId = CameraCharacteristics.LENS_FACING_BACK;
     private String mCameraIdStr = "";
     private Size mPreviewSize;
@@ -157,6 +160,7 @@ public class Camera2Proxy {
 
     public Camera2Proxy(Activity activity) {
         mActivity = activity;
+        mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
         mCameraManager = (CameraManager) mActivity.getSystemService(Context.CAMERA_SERVICE);
         mOrientationEventListener = new OrientationEventListener(mActivity) {
             @Override
@@ -299,26 +303,24 @@ public class Camera2Proxy {
             } // else may occur on an emulated device.
         }
 
+        boolean manualControl = true;
+        if (manualControl) {
+            float exposureTimeMs = (float) exposureNanos / 1e6f;
+            String exposureTimeMsStr = mSharedPreferences.getString(
+                    "prefExposureTime", String.valueOf(exposureTimeMs));
+            exposureNanos = (long) (Float.parseFloat(exposureTimeMsStr) * 1e6f);
+            String desiredIsoStr = mSharedPreferences.getString("prefISO", String.valueOf(desiredIso));
+            desiredIso = Integer.parseInt(desiredIsoStr);
+        }
         // fix exposure
         mPreviewRequestBuilder.set(
                 CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
-        Range<Long> exposureTimeRange = mCameraCharacteristics.get(
-                CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
-        if (exposureTimeRange != null) {
-            Timber.d("exposure time range %s", exposureTimeRange.toString());
-        }
 
         mPreviewRequestBuilder.set(
                 CaptureRequest.SENSOR_EXPOSURE_TIME, exposureNanos);
         Timber.d("Exposure time set to %d", exposureNanos);
 
         // fix ISO
-        Range<Integer> isoRange = mCameraCharacteristics.get(
-                CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
-        if (isoRange != null) {
-            Timber.d("ISO range %s", isoRange.toString());
-        }
-
         mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, desiredIso);
         Timber.d("ISO set to %d", desiredIso);
     }

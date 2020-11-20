@@ -12,11 +12,17 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.v7.preference.CheckBoxPreference;
+import android.support.v7.preference.EditTextPreference;
 import android.support.v7.preference.ListPreference;
 import android.support.v7.preference.Preference;
 import android.support.v7.preference.PreferenceFragmentCompat;
 import android.support.v7.preference.PreferenceManager;
+import android.util.Range;
 import android.util.Size;
+import android.widget.Toast;
+
+import timber.log.Timber;
 
 /**
  * Activities that contain this fragment must implement the
@@ -28,19 +34,9 @@ import android.util.Size;
 
 public class SettingsFragment extends PreferenceFragmentCompat
         implements SharedPreferences.OnSharedPreferenceChangeListener {
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
-    private static final String ARG_PARAM2 = "param2";
-    // The request code must be 0 or greater.
-    private static final int PLUS_ONE_REQUEST_CODE = 0;
-    // The URL to +1.  Must be a valid URL.
-    private final String PLUS_ONE_URL = "http://developer.android.com";
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
-
     private OnFragmentInteractionListener mListener;
+    private Range<Integer> isoRange = null;
+    private Range<Float> exposureTimeRangeMs = null;
 
     public SettingsFragment() {
         // Required empty public constructor
@@ -58,8 +54,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
     public static SettingsFragment newInstance(String param1, String param2) {
         SettingsFragment fragment = new SettingsFragment();
         Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
         fragment.setArguments(args);
         return fragment;
     }
@@ -67,11 +61,19 @@ public class SettingsFragment extends PreferenceFragmentCompat
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
-        }
     }
+
+    // Lisener for onclick on seperate ringtone checkbox to disable notification sound checkbox
+    private Preference.OnPreferenceClickListener chkboxListener = new Preference.OnPreferenceClickListener() {
+        public boolean onPreferenceClick(Preference preference) {
+            CheckBoxPreference cb = (CheckBoxPreference) preference;
+            ((CheckBoxPreference) findPreference("prefManualControl")).setChecked(cb.isChecked());
+//            myPrefsPrefsEditor = mSharedPreference.edit();
+//            myPrefsPrefsEditor.putBoolean(key, value);
+//            myPrefsPrefsEditor.commit();
+            return true;
+        }
+    };
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -145,6 +147,24 @@ public class SettingsFragment extends PreferenceFragmentCompat
             cameraRez.setEntries(rez);
             cameraRez.setEntryValues(rezValues);
             cameraRez.setDefaultValue(rezValues[0]);
+
+            isoRange = characteristics.get(
+                    CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+            if (isoRange != null) {
+                String rangeStr = "[" + isoRange.getLower() + "," + isoRange.getUpper() + "] (1)";
+                prefISO.setDialogTitle("Adjust ISO in range " + rangeStr);
+            }
+
+            Range<Long> exposureTimeRangeNs = characteristics.get(
+                    CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+            if (exposureTimeRangeNs != null) {
+                exposureTimeRangeMs = new Range<Float>(
+                        new Float(exposureTimeRangeNs.getLower().floatValue() / 1e6),
+                        new Float(exposureTimeRangeNs.getUpper().floatValue() / 1e6));
+                String rangeStr = "[" + exposureTimeRangeMs.getLower() + "," +
+                    exposureTimeRangeMs.getUpper() + "] (ms)";
+                prefExposureTime.setDialogTitle("Adjust exposure time in range " + rangeStr);
+            }
 
             // Get the possible focus lengths, on non-optical devices this only has one value
             // https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#LENS_INFO_AVAILABLE_FOCAL_LENGTHS

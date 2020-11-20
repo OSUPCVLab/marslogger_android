@@ -212,7 +212,7 @@ public class IMUManager implements SensorEventListener {
         mSensorThread = new HandlerThread("Sensor thread",
                 Process.THREAD_PRIORITY_MORE_FAVORABLE);
         mSensorThread.start();
-        String imuFreq = mSharedPreferences.getString("perfImuFreq", "1");
+        String imuFreq = mSharedPreferences.getString("prefImuFreq", "1");
         mSensorRate = Integer.parseInt(imuFreq);
         // Blocks until looper is prepared, which is fairly quick
         Handler sensorHandler = new Handler(mSensorThread.getLooper());
