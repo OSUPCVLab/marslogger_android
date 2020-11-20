@@ -63,18 +63,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
         super.onCreate(savedInstanceState);
     }
 
-    // Lisener for onclick on seperate ringtone checkbox to disable notification sound checkbox
-    private Preference.OnPreferenceClickListener chkboxListener = new Preference.OnPreferenceClickListener() {
-        public boolean onPreferenceClick(Preference preference) {
-            CheckBoxPreference cb = (CheckBoxPreference) preference;
-            ((CheckBoxPreference) findPreference("prefManualControl")).setChecked(cb.isChecked());
-//            myPrefsPrefsEditor = mSharedPreference.edit();
-//            myPrefsPrefsEditor.putBoolean(key, value);
-//            myPrefsPrefsEditor.commit();
-            return true;
-        }
-    };
-
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         // Indicate here the XML resource you created above that holds the preferences
@@ -89,7 +77,11 @@ public class SettingsFragment extends PreferenceFragmentCompat
         // Get our camera id list preference
         ListPreference cameraList = (ListPreference) getPreferenceManager().findPreference("prefCamera");
         ListPreference cameraRez = (ListPreference) getPreferenceManager().findPreference("prefSizeRaw");
+        //get a handle on preferences that require validation
+        EditTextPreference prefISO = (EditTextPreference) getPreferenceScreen().findPreference("prefISO");
+        EditTextPreference prefExposureTime = (EditTextPreference) getPreferenceScreen().findPreference("prefExposureTime");
 
+        prefISO.setOnPreferenceChangeListener(checkISOListener);
         try {
             // Load our camera settings
             Activity activity = getActivity();
@@ -180,6 +172,28 @@ public class SettingsFragment extends PreferenceFragmentCompat
             ErrorDialog.newInstance(getString(R.string.camera_error)).show(getFragmentManager(), "dialog");
         }
 
+    }
+
+    /**
+     * Checks that a preference is a valid numerical value
+     */
+    Preference.OnPreferenceChangeListener checkISOListener = new Preference.OnPreferenceChangeListener() {
+
+        @Override
+        public boolean onPreferenceChange(Preference preference, Object newValue) {
+            //Check that the string is an integer.
+            return checkIso(newValue);
+        }
+    };
+
+    private boolean checkIso(Object newValue) {
+        if( !newValue.toString().equals("")  &&  newValue.toString().matches("\\d*") ) {
+            return true;
+        }
+        else {
+            Toast.makeText(getActivity(), newValue+" is not a valid number!", Toast.LENGTH_SHORT).show();
+            return false;
+        }
     }
 
     @Override
