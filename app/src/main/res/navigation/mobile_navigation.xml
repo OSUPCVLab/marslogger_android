@@ -3,7 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/navigation_video">
+    app:startDestination="@+id/navigation_imuviewer">
+
+    <fragment
+        android:id="@+id/navigation_imuviewer"
+        android:name="edu.osu.pcv.marslogger.ImuViewFragment"
+        android:label="@string/title_imuviewer"
+        tools:layout="@layout/fragment_imu" />
 
     <activity
         android:id="@+id/navigation_video"
@@ -16,12 +22,6 @@
         android:name="edu.osu.pcv.marslogger.PhotoCaptureActivity"
         android:label="@string/title_photo"
         tools:layout="@layout/activity_photo_capture" />
-
-    <fragment
-        android:id="@+id/navigation_imuviewer"
-        android:name="edu.osu.pcv.marslogger.ImuViewFragment"
-        android:label="@string/title_imuviewer"
-        tools:layout="@layout/fragment_imu" />
 
     <activity
         android:id="@+id/navigation_about"

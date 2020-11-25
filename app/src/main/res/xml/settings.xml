@@ -33,12 +33,12 @@
 
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="Additional Sensors" >
+    <PreferenceCategory android:title="IMU Settings" >
 
         <ListPreference
             android:key="prefImuFreq"
             android:title="IMU Frequency"
-            android:summary="Frequency the IMU should collect at"
+            android:summary="Frequency the IMU is sampled at"
             android:entries="@array/imuFreq"
             android:entryValues="@array/imuFreqValues"
             android:defaultValue="1" />

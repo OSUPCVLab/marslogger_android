@@ -36,8 +36,9 @@ public class ImuRecyclerViewAdapter extends RecyclerView.Adapter<ImuRecyclerView
     @Override
     public void onBindViewHolder(final ViewHolder holder, int position) {
         holder.mItem = mValues.get(position);
-        holder.mIdView.setText(mValues.get(position).id);
-        holder.mContentView.setText(mValues.get(position).content);
+        holder.mIdView.setText(holder.mItem.id);
+        holder.mContentView.setText(holder.mItem.content);
+        holder.mUnitView.setText(holder.mItem.unit);
         holder.mView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -66,13 +67,14 @@ public class ImuRecyclerViewAdapter extends RecyclerView.Adapter<ImuRecyclerView
      * @param value
      */
     public void updateListItem(int position, float value) {
-        mValues.get(position).content = String.valueOf(value);
+        mValues.get(position).content = String.format("%.3f", value);
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {
         public final View mView;
         public final TextView mIdView;
         public final TextView mContentView;
+        public final TextView mUnitView;
         public SingleAxis mItem;
 
         public ViewHolder(View view) {
@@ -80,6 +82,7 @@ public class ImuRecyclerViewAdapter extends RecyclerView.Adapter<ImuRecyclerView
             mView = view;
             mIdView = (TextView) view.findViewById(R.id.item_number);
             mContentView = (TextView) view.findViewById(R.id.content);
+            mUnitView = (TextView) view.findViewById(R.id.unit);
         }
 
         @Override

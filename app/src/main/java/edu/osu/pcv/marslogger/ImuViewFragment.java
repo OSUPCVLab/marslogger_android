@@ -26,10 +26,7 @@ import edu.osu.pcv.marslogger.ImuViewContent.SingleAxis;
  * interface.
  */
 public class ImuViewFragment extends Fragment implements SensorEventListener {
-
-    // TODO: Customize parameter argument names
     private static final String ARG_COLUMN_COUNT = "column-count";
-    // TODO: Customize parameters
     private int mColumnCount = 1;
     private OnListFragmentInteractionListener mListener;
     ImuRecyclerViewAdapter mAdapter;
@@ -37,6 +34,7 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
     private SensorManager mSensorManager;
     private Sensor mAccel;
     private Sensor mGyro;
+    private Sensor mMag;
     private class SensorPacket {
         long timestamp;
         float[] values;
@@ -75,14 +73,14 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
 
         mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
         mAccel = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER); // warn: mAccel can be null.
-        mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE); // warn: mGyro can be null.
+        mMag = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_imu_list, container, false);
-
         // Set the adapter
         if (view instanceof RecyclerView) {
             Context context = view.getContext();
@@ -138,7 +136,6 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
      * >Communicating with Other Fragments</a> for more information.
      */
     public interface OnListFragmentInteractionListener {
-        // TODO: Update argument type and name
         void onListFragmentInteraction(SingleAxis item);
     }
 
@@ -164,6 +161,11 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
             for (int i = 0; i < 3; ++i) {
                 mAdapter.updateListItem(i + 3, sp.values[i]);
             }
+        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+            SensorPacket sp = new SensorPacket(event.timestamp, event.values);
+            for (int i = 0; i < 3; ++i) {
+                mAdapter.updateListItem(i + 6, sp.values[i]);
+            }
         }
         getActivity().runOnUiThread(new Runnable(){
             public void run() {
@@ -186,6 +188,8 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
                 this, mAccel, mSensorRate, sensorHandler);
         mSensorManager.registerListener(
                 this, mGyro, mSensorRate, sensorHandler);
+        mSensorManager.registerListener(
+                this, mMag, mSensorRate, sensorHandler);
     }
 
     /**
@@ -194,6 +198,7 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
     public void unregisterImu() {
         mSensorManager.unregisterListener(this, mAccel);
         mSensorManager.unregisterListener(this, mGyro);
+        mSensorManager.unregisterListener(this, mMag);
         mSensorManager.unregisterListener(this);
         mSensorThread.quitSafely();
     }

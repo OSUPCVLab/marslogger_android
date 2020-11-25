@@ -20,25 +20,25 @@ public class ImuViewContent {
 
     static {
         addItem(new SingleAxis("Accel X", String.valueOf(0.0),
-                "X axis of accelerometer (m/s^2)"));
+                "X axis of accelerometer", "(m/s^2)"));
         addItem(new SingleAxis( "Accel Y", String.valueOf(0.0),
-                "Y axis of accelerometer (m/s^2)"));
+                "Y axis of accelerometer", "(m/s^2)"));
         addItem(new SingleAxis( "Accel Z", String.valueOf(0.0),
-                "Z axis of accelerometer (m/s^2)"));
+                "Z axis of accelerometer", "(m/s^2)"));
 
         addItem(new SingleAxis( "Gyro X", String.valueOf(0.0),
-                "X axis of gyroscope (rad/s)"));
+                "X axis of gyroscope", "(rad/s)"));
         addItem(new SingleAxis( "Gyro Y", String.valueOf(0.0),
-                "Y axis of gyroscope (rad/s)"));
+                "Y axis of gyroscope", "(rad/s)"));
         addItem(new SingleAxis( "Gyro Z", String.valueOf(0.0),
-                "Z axis of gyroscope (rad/s)"));
+                "Z axis of gyroscope", "(rad/s)"));
 
         addItem(new SingleAxis("Mag X", String.valueOf(0.0),
-                "X axis of magnetometer (micro Tesla)"));
+                "X axis of magnetometer", "(uT)"));
         addItem(new SingleAxis( "Mag Y", String.valueOf(0.0),
-                "Y axis of magnetometer (micro Tesla)"));
+                "Y axis of magnetometer", "(uT)"));
         addItem(new SingleAxis("Mag Z", String.valueOf(0.0),
-                "Z axis of magnetometer (micro Tesla)"));
+                "Z axis of magnetometer", "(uT)"));
     }
 
     private static void addItem(SingleAxis item) {
@@ -50,11 +50,13 @@ public class ImuViewContent {
         public final String id;
         public String content;
         public final String details;
+        public final String unit;
 
-        public SingleAxis(String id, String content, String details) {
+        public SingleAxis(String id, String content, String details, String unit) {
             this.id = id;
             this.content = content;
             this.details = details;
+            this.unit = unit;
         }
 
         @Override
