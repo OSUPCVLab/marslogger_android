@@ -7,12 +7,12 @@
 
     <item
         android:id="@+id/navigation_video"
-        android:icon="@drawable/ic_home_black_24dp"
+        android:icon="@drawable/ic_videocam_24px"
         android:title="@string/title_video" />
 
     <item
         android:id="@+id/navigation_photo"
-        android:icon="@drawable/ic_dashboard_black_24dp"
+        android:icon="@drawable/ic_add_a_photo_24px"
         android:title="@string/title_photo" />
 
 

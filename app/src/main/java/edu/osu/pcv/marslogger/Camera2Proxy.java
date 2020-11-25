@@ -347,7 +347,7 @@ public class Camera2Proxy {
 //                    CaptureRequest.LENS_FOCUS_DISTANCE, minFocusDistance);
 //            Timber.d("Focus distance set to its min value %f", minFocusDistance);
 
-            List surfaces = new ArrayList<>();
+            List<Surface> surfaces = new ArrayList<>();
             if (previewForSnapshot) {
                 Surface readerSurface = mImageReader.getSurface();
                 surfaces.add(readerSurface);

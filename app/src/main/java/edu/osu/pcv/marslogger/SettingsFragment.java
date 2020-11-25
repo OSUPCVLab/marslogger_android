@@ -27,8 +27,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
-import timber.log.Timber;
-
 /**
  * Activities that contain this fragment must implement the
  * {@link SettingsFragment.OnFragmentInteractionListener} interface
@@ -66,6 +64,12 @@ public class SettingsFragment extends PreferenceFragmentCompat
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    public void onStop() {
+        ((NavActivity)getActivity()).settingsMenu.findItem(R.id.settings_option).setEnabled(true);
+        super.onStop();
     }
 
     @Override

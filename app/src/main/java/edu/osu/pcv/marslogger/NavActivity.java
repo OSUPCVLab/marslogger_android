@@ -24,6 +24,8 @@ public class NavActivity extends AppCompatActivity implements
         SettingsFragment.OnFragmentInteractionListener
 {
     private static final int RESULT_SETTINGS = 1;
+    public Menu settingsMenu;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,6 +45,7 @@ public class NavActivity extends AppCompatActivity implements
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.settings_menu, menu);
+        settingsMenu = menu;
         return true;
     }
 
@@ -55,6 +58,7 @@ public class NavActivity extends AppCompatActivity implements
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle item selection
+        item.setEnabled(false);
         switch (item.getItemId()) {
             case R.id.settings_option:
                 Timber.d("Start settings");
@@ -67,6 +71,7 @@ public class NavActivity extends AppCompatActivity implements
                 return true;
             case R.id.help_option:
                 Timber.d("Show help");
+                item.setEnabled(true);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
