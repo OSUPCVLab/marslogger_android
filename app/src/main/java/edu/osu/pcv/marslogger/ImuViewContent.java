@@ -20,25 +20,25 @@ public class ImuViewContent {
 
     static {
         addItem(new SingleAxis("Accel X", String.valueOf(0.0),
-                "X axis of accelerometer", "(m/s^2)"));
+                "X axis of accelerometer", "m/s<sup><small>2</small></sup>"));
         addItem(new SingleAxis( "Accel Y", String.valueOf(0.0),
-                "Y axis of accelerometer", "(m/s^2)"));
+                "Y axis of accelerometer", "m/s<sup><small>2</small></sup>"));
         addItem(new SingleAxis( "Accel Z", String.valueOf(0.0),
-                "Z axis of accelerometer", "(m/s^2)"));
+                "Z axis of accelerometer", "m/s<sup><small>2</small></sup>"));
 
         addItem(new SingleAxis( "Gyro X", String.valueOf(0.0),
-                "X axis of gyroscope", "(rad/s)"));
+                "X axis of gyroscope", "rad/s"));
         addItem(new SingleAxis( "Gyro Y", String.valueOf(0.0),
-                "Y axis of gyroscope", "(rad/s)"));
+                "Y axis of gyroscope", "rad/s"));
         addItem(new SingleAxis( "Gyro Z", String.valueOf(0.0),
-                "Z axis of gyroscope", "(rad/s)"));
+                "Z axis of gyroscope", "rad/s"));
 
         addItem(new SingleAxis("Mag X", String.valueOf(0.0),
-                "X axis of magnetometer", "(uT)"));
+                "X axis of magnetometer", "&mu T"));
         addItem(new SingleAxis( "Mag Y", String.valueOf(0.0),
-                "Y axis of magnetometer", "(uT)"));
+                "Y axis of magnetometer", "&mu T"));
         addItem(new SingleAxis("Mag Z", String.valueOf(0.0),
-                "Z axis of magnetometer", "(uT)"));
+                "Z axis of magnetometer", "&mu T"));
     }
 
     private static void addItem(SingleAxis item) {

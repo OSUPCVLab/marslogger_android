@@ -1,6 +1,7 @@
 package edu.osu.pcv.marslogger;
 
 import android.support.v7.widget.RecyclerView;
+import android.text.Html;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,7 +39,7 @@ public class ImuRecyclerViewAdapter extends RecyclerView.Adapter<ImuRecyclerView
         holder.mItem = mValues.get(position);
         holder.mIdView.setText(holder.mItem.id);
         holder.mContentView.setText(holder.mItem.content);
-        holder.mUnitView.setText(holder.mItem.unit);
+        holder.mUnitView.setText(Html.fromHtml(holder.mItem.unit, Html.FROM_HTML_MODE_LEGACY));
         holder.mView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
