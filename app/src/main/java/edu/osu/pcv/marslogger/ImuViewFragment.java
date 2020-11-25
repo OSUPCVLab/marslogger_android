@@ -82,6 +82,7 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // A hack to deal with the case when the settings window is open.
+        // TODO(jhuai): There is a possibility of two Settings windows overlaid.
         // A better option is to read the Android doc about communicating with fragments.
         Menu containerMenu = ((NavActivity)getActivity()).settingsMenu;
         if (containerMenu != null && !containerMenu.findItem(R.id.settings_option).isEnabled()) {

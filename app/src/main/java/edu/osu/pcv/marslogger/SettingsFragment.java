@@ -67,9 +67,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
     }
 
     @Override
-    public void onStop() {
+    public void onDestroy() {
         ((NavActivity)getActivity()).settingsMenu.findItem(R.id.settings_option).setEnabled(true);
-        super.onStop();
+        super.onDestroy();
     }
 
     @Override
