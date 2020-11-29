@@ -68,16 +68,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
     @Override
     public void onDestroy() {
-        ((NavActivity)getActivity()).settingsMenu.findItem(R.id.settings_option).setEnabled(true);
         super.onDestroy();
-    }
-
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        // https://stackoverflow.com/questions/62658278/android-x-preferencefragmentcompat-overlap-androidx-fragment-app-fragment
-        View view = super.onCreateView(inflater, container, savedInstanceState);
-        view.setBackgroundColor(Color.parseColor("#303030"));
-        return view;
     }
 
     @Override
