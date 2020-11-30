@@ -7,11 +7,11 @@
             android:key="switchManualControl"
             android:summaryOff="Off"
             android:summaryOn="On"
-            android:title="Switch manual control" />
+            android:title="Switch Manual Control" />
 
         <ListPreference
             android:key="prefFocusDistance"
-            android:title="Focus Distances"
+            android:title="Adjust Focus Distances"
             android:summary="Lock the focus distance (mm) before tap to focus" />
 
         <EditTextPreference
@@ -22,7 +22,7 @@
 
         <EditTextPreference
             android:key="prefExposureTime"
-            android:title="Adjust exposure time"
+            android:title="Adjust Exposure Time"
             android:summary="Lock exposure time to a custom value"
             android:dialogTitle="Adjust exposure time" />
 
@@ -33,7 +33,7 @@
 
         <ListPreference
             android:key="prefSizeRaw"
-            android:title="Raw Image Size"
+            android:title="Frame Size"
             android:summary="Set the incoming image size" />
 
     </PreferenceCategory>

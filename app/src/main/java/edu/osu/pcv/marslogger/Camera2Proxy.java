@@ -50,7 +50,6 @@ public class Camera2Proxy {
 
     private Activity mActivity;
     private static SharedPreferences mSharedPreferences;
-    private int mCameraId = CameraCharacteristics.LENS_FACING_BACK;
     private String mCameraIdStr = "";
     private Size mPreviewSize;
     private Size mVideoSize;
@@ -106,6 +105,10 @@ public class Camera2Proxy {
 
     public Integer getmTimeSourceValue() {
         return mTimeSourceValue;
+    }
+
+    public Size getmVideoSize() {
+        return mVideoSize;
     }
 
     public void startRecordingCaptureResult(String captureResultFile) {
@@ -169,10 +172,16 @@ public class Camera2Proxy {
         };
     }
 
-    public Size configureCamera(int width, int height) {
+    public Size configureCamera() {
         try {
-            mCameraIdStr = CameraUtils.getRearCameraId(mCameraManager);
+            mCameraIdStr = mSharedPreferences.getString("prefCamera", "0");
             mCameraCharacteristics = mCameraManager.getCameraCharacteristics(mCameraIdStr);
+
+            String imageSize = mSharedPreferences.getString("prefSizeRaw",
+                    DesiredCameraSetting.mDesiredFrameSize);
+            int width = Integer.parseInt(imageSize.substring(0, imageSize.lastIndexOf("x")));
+            int height = Integer.parseInt(imageSize.substring(imageSize.lastIndexOf("x") + 1));
+
             sensorArraySize = mCameraCharacteristics.get(
                     CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
             mTimeSourceValue = mCameraCharacteristics.get(
@@ -199,15 +208,15 @@ public class Camera2Proxy {
     }
 
     @SuppressLint("MissingPermission")
-    public void openCamera(int width, int height, boolean supportSnapshot) {
+    public void openCamera(boolean supportSnapshot) {
         Timber.v("openCamera");
         startBackgroundThread();
         mOrientationEventListener.enable();
         if (mCameraIdStr.isEmpty()) {
-            configureCamera(width, height);
+            configureCamera();
         }
         if (supportSnapshot)
-            initImageReader(width, height);
+            initImageReader();
         mSupportSnapshot = supportSnapshot;
         try {
             mCameraManager.openCamera(mCameraIdStr, mStateCallback, mBackgroundHandler);
@@ -245,17 +254,11 @@ public class Camera2Proxy {
         mPreviewSurfaceTexture = surfaceTexture;
     }
 
-    private void initImageReader(int width, int height) {
-        StreamConfigurationMap map = mCameraCharacteristics.get(CameraCharacteristics
-                .SCALER_STREAM_CONFIGURATION_MAP);
-        Size[] previewSizeChoices = map.getOutputSizes(SurfaceTexture.class);
-        if (width == 0 || height == 0) {
-            width = 1280;
-            height = 720;
-        }
-        Size imageSize = CameraUtils.chooseVideoSize(previewSizeChoices, width, height, width);
-
-        mImageReader = ImageReader.newInstance(imageSize.getWidth(), imageSize.getHeight(),
+    /**
+     * assume mVideoSize has been initialized say by configureCamera.
+     */
+    private void initImageReader() {
+        mImageReader = ImageReader.newInstance(mVideoSize.getWidth(), mVideoSize.getHeight(),
                 ImageFormat.JPEG, 3);
         // Because saving images is done on the main UI thread, the handler is set null.
         // If the handler is not null say mBackgroundHandler, when onPause() is called,

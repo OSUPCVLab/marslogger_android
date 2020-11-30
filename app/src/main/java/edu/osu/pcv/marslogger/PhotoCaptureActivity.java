@@ -56,7 +56,6 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
 
     private TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
     private IMUManager mImuManager;
-    private TimeBaseManager mTimeBaseManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,10 +71,11 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
     protected void onStart() {
         super.onStart();
         mCamera2Proxy = new Camera2Proxy(this);
-        Size previewSize =
-                mCamera2Proxy.configureCamera(DesiredCameraSetting.mDesiredFrameWidth,
-                        DesiredCameraSetting.mDesiredFrameHeight);
-        setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
+        Size previewSize = mCamera2Proxy.configureCamera();
+        setLayoutAspectRatio(previewSize);
+        Size videoSize = mCamera2Proxy.getmVideoSize();
+        mVideoFrameWidth = videoSize.getWidth();
+        mVideoFrameHeight = videoSize.getHeight();
 
         // Define a handler that receives camera-control messages from other threads.  All calls
         // to Camera must be made on the same thread.  Note we create this before the renderer
@@ -85,10 +85,10 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
         // Configure the GLSurfaceView.  This will start the Renderer thread, with an
         // appropriate EGL context.
         mGLView = (SampleGLView) findViewById(R.id.cameraPreview_surfaceView);
-        mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
         if (mRenderer == null) {
             mRenderer = new CameraSurfaceRenderer(
                     mCameraHandler, sVideoEncoder);
+            mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
             mGLView.setRenderer(mRenderer);
             mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         }
@@ -99,10 +99,9 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
-
-        mImuManager = new IMUManager(this);
-        mTimeBaseManager = new TimeBaseManager();
-
+        if (mImuManager == null) {
+            mImuManager = new IMUManager(this);
+        }
         mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
         mOutputDirText = (TextView) findViewById(R.id.cameraOutputDir_text);
@@ -117,10 +116,11 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
 
         if (mCamera2Proxy == null) {
             mCamera2Proxy = new Camera2Proxy(this);
-            Size previewSize =
-                    mCamera2Proxy.configureCamera(DesiredCameraSetting.mDesiredFrameWidth,
-                            DesiredCameraSetting.mDesiredFrameHeight);
-            setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
+            Size previewSize = mCamera2Proxy.configureCamera();
+            setLayoutAspectRatio(previewSize);
+            Size videoSize = mCamera2Proxy.getmVideoSize();
+            mVideoFrameWidth = videoSize.getWidth();
+            mVideoFrameHeight = videoSize.getHeight();
         }
 
         mGLView.onResume();
@@ -128,6 +128,7 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
             @Override
             public void run() {
                 mRenderer.setCameraPreviewSize(mCameraPreviewWidth, mCameraPreviewHeight);
+                mRenderer.setVideoFrameSize(mVideoFrameWidth, mVideoFrameHeight);
             }
         });
         mImuManager.register();

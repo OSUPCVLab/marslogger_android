@@ -27,6 +27,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import timber.log.Timber;
+
 /**
  * Activities that contain this fragment must implement the
  * {@link SettingsFragment.OnFragmentInteractionListener} interface
@@ -126,7 +128,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             // Update our settings entry
             cameraList.setEntries(entries);
             cameraList.setEntryValues(entriesValues);
-            cameraList.setDefaultValue(entriesValues[0]);
+            cameraList.setValueIndex(0);
 
             // Right now we have selected the first camera, so lets populate the resolution list
             // We should just use the default if there is not a shared setting yet
@@ -138,17 +140,21 @@ public class SettingsFragment extends PreferenceFragmentCompat
             int rezSize = sizes.length;
             CharSequence[] rez = new CharSequence[rezSize];
             CharSequence[] rezValues = new CharSequence[rezSize];
-
-            // Loop through and create our entries
+            int defaultIndex = 0;
             for (int i = 0; i < sizes.length; i++) {
                 rez[i] = sizes[i].getWidth() + "x" + sizes[i].getHeight();
                 rezValues[i] = sizes[i].getWidth() + "x" + sizes[i].getHeight();
+                if (sizes[i].getWidth() + sizes[i].getHeight() ==
+                        DesiredCameraSetting.mDesiredFrameWidth +
+                                DesiredCameraSetting.mDesiredFrameHeight) {
+                    defaultIndex = i;
+                }
             }
 
             // Update our settings entry
             cameraRez.setEntries(rez);
             cameraRez.setEntryValues(rezValues);
-            cameraRez.setDefaultValue(rezValues[0]);
+            cameraRez.setValueIndex(defaultIndex);
 
             isoRange = characteristics.get(
                     CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
@@ -178,7 +184,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
             cameraFocus.setEntries(focuses);
             cameraFocus.setEntryValues(focuses);
-            cameraFocus.setDefaultValue(focuses[0]);
             cameraFocus.setValueIndex(0);
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -232,19 +237,23 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 int rezSize = sizes.length;
                 CharSequence[] rez = new CharSequence[rezSize];
                 CharSequence[] rezValues = new CharSequence[rezSize];
-
+                int defaultIndex = 0;
                 // Loop through and create our entries
                 for (int i = 0; i < sizes.length; i++) {
                     rez[i] = sizes[i].getWidth() + "x" + sizes[i].getHeight();
                     rezValues[i] = sizes[i].getWidth() + "x" + sizes[i].getHeight();
+                    if (sizes[i].getWidth() + sizes[i].getHeight() ==
+                            DesiredCameraSetting.mDesiredFrameWidth +
+                                    DesiredCameraSetting.mDesiredFrameHeight) {
+                        defaultIndex = i;
+                    }
                 }
 
                 // Update our settings entry
                 ListPreference cameraRez = (ListPreference) getPreferenceManager().findPreference("prefSizeRaw");
                 cameraRez.setEntries(rez);
                 cameraRez.setEntryValues(rezValues);
-                cameraRez.setDefaultValue(rezValues[0]);
-                cameraRez.setValueIndex(0);
+                cameraRez.setValueIndex(defaultIndex);
 
                 // Get the possible focus lengths, on non-optical devices this only has one value
                 // https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#LENS_INFO_AVAILABLE_FOCAL_LENGTHS
@@ -257,7 +266,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 ListPreference cameraFocus = (ListPreference)getPreferenceManager().findPreference("prefFocusDistance");
                 cameraFocus.setEntries(focuses);
                 cameraFocus.setEntryValues(focuses);
-                cameraFocus.setDefaultValue(focuses[0]);
                 cameraFocus.setValueIndex(0);
 
             } catch (CameraAccessException e) {

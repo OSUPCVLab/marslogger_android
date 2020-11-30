@@ -136,6 +136,8 @@ class DesiredCameraSetting {
     static final int mDesiredFrameWidth = 1280;
     static final int mDesiredFrameHeight = 720;
     static final Long mDesiredExposureTime = 5000000L; // nanoseconds
+    static final String mDesiredFrameSize = mDesiredFrameWidth +
+            "x" + mDesiredFrameHeight;
 }
 
 
@@ -155,6 +157,7 @@ class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFra
     protected TextView mCaptureResultText;
 
     protected int mCameraPreviewWidth, mCameraPreviewHeight;
+    protected int mVideoFrameWidth, mVideoFrameHeight;
     static boolean mSnapshotMode = false;
     protected Camera2Proxy mCamera2Proxy = null;
 
@@ -169,7 +172,7 @@ class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFra
 
         if (mCamera2Proxy != null) {
             mCamera2Proxy.setPreviewSurfaceTexture(st);
-            mCamera2Proxy.openCamera(0, 0, mSnapshotMode);
+            mCamera2Proxy.openCamera(mSnapshotMode);
         } else {
             throw new RuntimeException(
                     "Try to set surface texture while camera2proxy is null");
@@ -318,12 +321,11 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     protected void onStart() {
         super.onStart();
         mCamera2Proxy = new Camera2Proxy(this);
-        Size previewSize =
-                mCamera2Proxy.configureCamera(
-                        DesiredCameraSetting.mDesiredFrameWidth,
-                        DesiredCameraSetting.mDesiredFrameHeight);
+        Size previewSize = mCamera2Proxy.configureCamera();
         setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
-
+        Size videoSize = mCamera2Proxy.getmVideoSize();
+        mVideoFrameWidth = videoSize.getWidth();
+        mVideoFrameHeight = videoSize.getHeight();
         // Define a handler that receives camera-control messages from other threads.  All calls
         // to Camera must be made on the same thread.  Note we create this before the renderer
         // thread, so we know the fully-constructed object will be visible.
@@ -334,10 +336,10 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         // Configure the GLSurfaceView.  This will start the Renderer thread, with an
         // appropriate EGL context.
         mGLView = (SampleGLView) findViewById(R.id.cameraPreview_surfaceView);
-        mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
         if (mRenderer == null) {
             mRenderer = new CameraSurfaceRenderer(
                     mCameraHandler, sVideoEncoder);
+            mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
             mGLView.setRenderer(mRenderer);
             mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         }
@@ -348,16 +350,14 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
-
-        mImuManager = new IMUManager(this);
-        mTimeBaseManager = new TimeBaseManager();
-
+        if (mImuManager == null) {
+            mImuManager = new IMUManager(this);
+            mTimeBaseManager = new TimeBaseManager();
+        }
         mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
         mOutputDirText = (TextView) findViewById(R.id.cameraOutputDir_text);
     }
-
-
 
     @Override
     protected void onResume() {
@@ -369,11 +369,11 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
         if (mCamera2Proxy == null) {
             mCamera2Proxy = new Camera2Proxy(this);
-            Size previewSize =
-                    mCamera2Proxy.configureCamera(
-                            DesiredCameraSetting.mDesiredFrameWidth,
-                            DesiredCameraSetting.mDesiredFrameHeight);
-            setLayoutAspectRatio(previewSize);  // updates mCameraPreviewWidth/Height
+            Size previewSize = mCamera2Proxy.configureCamera();
+            setLayoutAspectRatio(previewSize);
+            Size videoSize = mCamera2Proxy.getmVideoSize();
+            mVideoFrameWidth = videoSize.getWidth();
+            mVideoFrameHeight = videoSize.getHeight();
         }
 
         mGLView.onResume();
@@ -381,6 +381,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             @Override
             public void run() {
                 mRenderer.setCameraPreviewSize(mCameraPreviewWidth, mCameraPreviewHeight);
+                mRenderer.setVideoFrameSize(mVideoFrameWidth, mVideoFrameHeight);
             }
         });
         mImuManager.register();
@@ -468,15 +469,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         updateControls();
     }
 
-//    /**
-//     * onClick handler for "rebind" checkbox.
-//     */
-//    public void clickRebindCheckbox(View unused) {
-//        CheckBox cb = (CheckBox) findViewById(R.id.rebindHack_checkbox);
-//        TextureRender.sWorkAroundContextProblem = cb.isChecked();
-//    }
-
-
     /**
      * Updates the on-screen controls to reflect the current state of the app.
      */
@@ -485,9 +477,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         int id = mRecordingEnabled ?
                 R.string.toggleRecordingOff : R.string.toggleRecordingOn;
         toggleRelease.setText(id);
-
-        //CheckBox cb = (CheckBox) findViewById(R.id.rebindHack_checkbox);
-        //cb.setChecked(TextureRender.sWorkAroundContextProblem);
     }
 
 }
@@ -583,6 +572,9 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
     private int mIncomingWidth;
     private int mIncomingHeight;
 
+    private int mVideoFrameWidth;
+    private int mVideoFrameHeight;
+
     private int mCurrentFilter;
     private int mNewFilter;
 
@@ -606,6 +598,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
         mIncomingSizeUpdated = false;
         mIncomingWidth = mIncomingHeight = -1;
+        mVideoFrameWidth = mVideoFrameHeight = -1;
 
         // We could preserve the old filter mode, but currently not bothering.
         mCurrentFilter = -1;
@@ -633,6 +626,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
             mFullScreen = null;             //  to be destroyed
         }
         mIncomingWidth = mIncomingHeight = -1;
+        mVideoFrameWidth = mVideoFrameHeight = -1;
     }
 
     /**
@@ -732,6 +726,11 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
         mIncomingSizeUpdated = true;
     }
 
+    public void setVideoFrameSize(int width, int height) {
+        mVideoFrameWidth = width;
+        mVideoFrameHeight = height;
+    }
+
     @Override
     public void onSurfaceCreated(GL10 unused, EGLConfig config) {
         Timber.d("onSurfaceCreated");
@@ -784,6 +783,10 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
         if (mRecordingEnabled) {
             switch (mRecordingStatus) {
                 case RECORDING_OFF:
+                    if (mVideoFrameWidth <= 0 || mVideoFrameHeight <= 0) {
+                        Timber.i("Start recording before setting video frame size; skipping");
+                        break;
+                    }
                     Timber.d("START recording");
                     // TODO(jhuai): why does the height and width have to be swapped here?
                     // The output video has a size e.g., 720x1280. Video of the same size is recorded in
@@ -792,10 +795,8 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                     mVideoEncoder.startRecording(
                             new TextureMovieEncoder.EncoderConfig(
                                     mOutputFile,
-                                    DesiredCameraSetting.mDesiredFrameHeight,
-                                    DesiredCameraSetting.mDesiredFrameWidth,
-                                    CameraUtils.calcBitRate(DesiredCameraSetting.mDesiredFrameWidth,
-                                            DesiredCameraSetting.mDesiredFrameHeight,
+                                    mVideoFrameHeight, mVideoFrameWidth,
+                                    CameraUtils.calcBitRate(mVideoFrameWidth, mVideoFrameHeight,
                                             VideoEncoderCore.FRAME_RATE),
                                     EGL14.eglGetCurrentContext(),
                                     mMetadataFile));
