@@ -9,17 +9,22 @@
             android:summaryOn="On"
             android:title="Switch manual control" />
 
+        <ListPreference
+            android:key="prefFocusDistance"
+            android:title="Focus Distances"
+            android:summary="Lock the focus distance (mm) before tap to focus" />
+
         <EditTextPreference
             android:key="prefISO"
             android:title="Adjust ISO"
-            android:summary="Lock ISO to the custom value"
-            android:dialogTitle="Adjust ISO dialog" />
+            android:summary="Lock ISO to a custom value"
+            android:dialogTitle="Adjust ISO" />
 
         <EditTextPreference
             android:key="prefExposureTime"
             android:title="Adjust exposure time"
-            android:summary="Lock exposure time to custom value"
-            android:dialogTitle="Adjust exposure time dialog" />
+            android:summary="Lock exposure time to a custom value"
+            android:dialogTitle="Adjust exposure time" />
 
         <ListPreference
             android:key="prefCamera"

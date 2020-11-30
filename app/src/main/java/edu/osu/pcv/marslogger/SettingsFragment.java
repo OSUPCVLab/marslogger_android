@@ -85,6 +85,8 @@ public class SettingsFragment extends PreferenceFragmentCompat
         // Get our camera id list preference
         ListPreference cameraList = (ListPreference) getPreferenceManager().findPreference("prefCamera");
         ListPreference cameraRez = (ListPreference) getPreferenceManager().findPreference("prefSizeRaw");
+        ListPreference cameraFocus = (ListPreference) getPreferenceManager().findPreference("prefFocusDistance");
+
         //get a handle on preferences that require validation
         EditTextPreference prefISO = (EditTextPreference) getPreferenceScreen().findPreference("prefISO");
         EditTextPreference prefExposureTime = (EditTextPreference) getPreferenceScreen().findPreference("prefExposureTime");
@@ -173,6 +175,11 @@ public class SettingsFragment extends PreferenceFragmentCompat
             for (int i = 0; i < focus_lengths.length; i++) {
                 focuses[i] = focus_lengths[i] + "";
             }
+
+            cameraFocus.setEntries(focuses);
+            cameraFocus.setEntryValues(focuses);
+            cameraFocus.setDefaultValue(focuses[0]);
+            cameraFocus.setValueIndex(0);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         } catch (NullPointerException e) {
@@ -246,6 +253,12 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 for (int i = 0; i < focus_lengths.length; i++) {
                     focuses[i] = focus_lengths[i] + "";
                 }
+
+                ListPreference cameraFocus = (ListPreference)getPreferenceManager().findPreference("prefFocusDistance");
+                cameraFocus.setEntries(focuses);
+                cameraFocus.setEntryValues(focuses);
+                cameraFocus.setDefaultValue(focuses[0]);
+                cameraFocus.setValueIndex(0);
 
             } catch (CameraAccessException e) {
                 e.printStackTrace();

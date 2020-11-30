@@ -21,14 +21,14 @@ import android.hardware.camera2.params.MeteringRectangle;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
-import android.os.Build;
+
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
-import android.support.v7.preference.CheckBoxPreference;
+
 import android.util.Log;
-import android.util.Range;
+
 import android.util.Size;
 import android.util.SizeF;
 import android.view.OrientationEventListener;
@@ -39,8 +39,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
+
 import java.util.List;
 
 import timber.log.Timber;
@@ -337,15 +336,16 @@ public class Camera2Proxy {
                     CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
 
             // fix focus distance
-//            mPreviewRequestBuilder.set(
-//                    CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-//            Float minFocusDistance = mCameraCharacteristics.get(
-//                    CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
-//            if (minFocusDistance == null)
-//                minFocusDistance = 5.0f;
-//            mPreviewRequestBuilder.set(
-//                    CaptureRequest.LENS_FOCUS_DISTANCE, minFocusDistance);
-//            Timber.d("Focus distance set to its min value %f", minFocusDistance);
+            boolean manualControl = mSharedPreferences.getBoolean("switchManualControl", false);
+            if (manualControl) {
+                String focus = mSharedPreferences.getString("prefFocusDistance", "5.0");
+                Float focusDistance = Float.parseFloat(focus);
+                mPreviewRequestBuilder.set(
+                        CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+                mPreviewRequestBuilder.set(
+                        CaptureRequest.LENS_FOCUS_DISTANCE, focusDistance);
+                Timber.d("Focus distance set to %f", focusDistance);
+            }
 
             List<Surface> surfaces = new ArrayList<>();
             if (previewForSnapshot) {
