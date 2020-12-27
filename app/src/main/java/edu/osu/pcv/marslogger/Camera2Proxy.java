@@ -73,6 +73,38 @@ public class Camera2Proxy {
     private int mDeviceOrientation = 0;
     private int mZoom = 1;
 
+
+    /**
+     * Camera state: Showing camera preview.
+     */
+    private static final int STATE_PREVIEW = 0;
+
+    /**
+     * Wait until the CONTROL_AF_MODE is in auto.
+     */
+    private static final int STATE_WAITING_AUTO = 1;
+
+    /**
+     * Trigger auto focus algorithm.
+     */
+    private static final int STATE_TRIGGER_AUTO = 2;
+
+    /**
+     * Camera state: Waiting for the focus to be locked.
+     */
+    private static final int STATE_WAITING_LOCK = 3;
+
+    /**
+     * Camera state: Focus distance is locked.
+     */
+    private static final int STATE_FOCUS_LOCKED = 4;
+    /**
+     * The current state of camera state for taking pictures.
+     *
+     * @see #mFocusCaptureCallback
+     */
+    private int mState = STATE_PREVIEW;
+
     private BufferedWriter mFrameMetadataWriter = null;
 
     // https://stackoverflow.com/questions/3786825/volatile-boolean-vs-atomicboolean
@@ -386,69 +418,6 @@ public class Camera2Proxy {
         }
     }
 
-
-    private CameraCaptureSession.CaptureCallback mSessionCaptureCallback =
-            new CameraCaptureSession.CaptureCallback() {
-
-                @Override
-                public void onCaptureCompleted(CameraCaptureSession session,
-                                               CaptureRequest request,
-                                               TotalCaptureResult result) {
-                    Long timestamp = result.get(CaptureResult.SENSOR_TIMESTAMP);
-                    Long number = result.getFrameNumber();
-                    Long exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME);
-
-                    Long frmDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION);
-                    Long frmReadoutNs = result.get(CaptureResult.SENSOR_ROLLING_SHUTTER_SKEW);
-                    Integer iso = result.get(CaptureResult.SENSOR_SENSITIVITY);
-                    if (expoStats.size() > kMaxExpoSamples) {
-                        expoStats.subList(0, kMaxExpoSamples / 2).clear();
-                    }
-                    expoStats.add(new NumExpoIso(number, exposureTimeNs, iso));
-
-                    Float fl = result.get(CaptureResult.LENS_FOCAL_LENGTH);
-
-                    Float fd = result.get(CaptureResult.LENS_FOCUS_DISTANCE);
-
-                    Integer afMode = result.get(CaptureResult.CONTROL_AF_MODE);
-
-                    Rect rect = result.get(CaptureResult.SCALER_CROP_REGION);
-                    mFocalLengthHelper.setmFocalLength(fl);
-                    mFocalLengthHelper.setmFocusDistance(fd);
-                    mFocalLengthHelper.setmCropRegion(rect);
-                    SizeF sz_focal_length = mFocalLengthHelper.getFocalLengthPixel();
-                    String delimiter = ",";
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(timestamp);
-                    sb.append(delimiter + sz_focal_length.getWidth());
-                    sb.append(delimiter + sz_focal_length.getHeight());
-                    sb.append(delimiter + number);
-                    sb.append(delimiter + exposureTimeNs);
-                    sb.append(delimiter + frmDurationNs);
-                    sb.append(delimiter + frmReadoutNs);
-                    sb.append(delimiter + iso);
-                    sb.append(delimiter + fl);
-                    sb.append(delimiter + fd);
-                    sb.append(delimiter + afMode);
-                    String frame_info = sb.toString();
-                    if (mRecordingMetadata) {
-                        try {
-                            mFrameMetadataWriter.write(frame_info + "\n");
-                        } catch (IOException err) {
-                            Timber.e(err, "Error writing captureResult");
-                        }
-                    }
-                    ((CameraCaptureActivityBase) mActivity).updateCaptureResultPanel(
-                            sz_focal_length.getWidth(), exposureTimeNs, afMode);
-                }
-
-                @Override
-                public void onCaptureProgressed(CameraCaptureSession session, CaptureRequest request,
-                                                CaptureResult partialResult) {
-                }
-            };
-
-
     public void startPreview() {
         Timber.v("startPreview");
         if (mCaptureSession == null || mPreviewRequestBuilder == null) {
@@ -457,7 +426,7 @@ public class Camera2Proxy {
         }
         try {
             mCaptureSession.setRepeatingRequest(
-                    mPreviewRequest, mSessionCaptureCallback, mBackgroundHandler);
+                    mPreviewRequest, mFocusCaptureCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
             Timber.e(e);
         }
@@ -476,8 +445,135 @@ public class Camera2Proxy {
         }
     }
 
-    // TODO(jhuai): analyze the mechanism behind lock AF upon touch,
-    // make sure it won't cause sync issues with other Camera2Proxy methods
+    /**
+     * A {@link CameraCaptureSession.CaptureCallback} that handles events related to tap to focus.
+     * https://stackoverflow.com/questions/42127464/how-to-lock-focus-in-camera2-api-android
+     */
+    private CameraCaptureSession.CaptureCallback mFocusCaptureCallback
+            = new CameraCaptureSession.CaptureCallback() {
+
+        private void process(CaptureResult result) {
+            switch (mState) {
+                case STATE_PREVIEW: {
+                    // We have nothing to do when the camera preview is working normally.
+                    break;
+                }
+                case STATE_WAITING_AUTO: {
+                    Integer afMode = result.get(CaptureResult.CONTROL_AF_MODE);
+                    if (afMode != null && afMode == CaptureResult.CONTROL_AF_MODE_AUTO) {
+                        mState = STATE_TRIGGER_AUTO;
+
+                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                                CaptureRequest.CONTROL_AF_MODE_AUTO);
+                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
+                                CameraMetadata.CONTROL_AF_TRIGGER_START);
+                        try {
+                            mCaptureSession.capture(
+                                    mPreviewRequestBuilder.build(),
+                                    mFocusCaptureCallback, mBackgroundHandler);
+                        } catch (CameraAccessException e) {
+                            Timber.e(e);
+                        }
+                    }
+                    break;
+                }
+                case STATE_TRIGGER_AUTO: {
+                    mState = STATE_WAITING_LOCK;
+
+                    setExposureAndIso();
+
+                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                            CaptureRequest.CONTROL_AF_MODE_AUTO);
+                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
+                            CameraMetadata.CONTROL_AF_TRIGGER_IDLE);
+                    try {
+                        mCaptureSession.setRepeatingRequest(
+                                mPreviewRequestBuilder.build(),
+                                mFocusCaptureCallback, mBackgroundHandler);
+                    } catch (CameraAccessException e) {
+                        Timber.e(e);
+                    }
+                    Timber.d("Focus trigger auto");
+                    break;
+                }
+                case STATE_WAITING_LOCK: {
+                    Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
+                    if (afState == null) {
+                        mState = STATE_FOCUS_LOCKED;
+                    } else if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState ||
+                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
+                        mState = STATE_FOCUS_LOCKED;
+                        Timber.d("Focus locked after waiting lock");
+                    }
+                    break;
+                }
+            }
+        }
+
+        @Override
+        public void onCaptureProgressed(@NonNull CameraCaptureSession session,
+                                        @NonNull CaptureRequest request,
+                                        @NonNull CaptureResult partialResult) {
+            process(partialResult);
+        }
+
+        @Override
+        public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                       @NonNull CaptureRequest request,
+                                       @NonNull TotalCaptureResult result) {
+            process(result);
+
+            Long timestamp = result.get(CaptureResult.SENSOR_TIMESTAMP);
+            Long number = result.getFrameNumber();
+            Long exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME);
+
+            Long frmDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION);
+            Long frmReadoutNs = result.get(CaptureResult.SENSOR_ROLLING_SHUTTER_SKEW);
+            Integer iso = result.get(CaptureResult.SENSOR_SENSITIVITY);
+            if (expoStats.size() > kMaxExpoSamples) {
+                expoStats.subList(0, kMaxExpoSamples / 2).clear();
+            }
+            expoStats.add(new NumExpoIso(number, exposureTimeNs, iso));
+
+            Float fl = result.get(CaptureResult.LENS_FOCAL_LENGTH);
+
+            Float fd = result.get(CaptureResult.LENS_FOCUS_DISTANCE);
+
+            Integer afMode = result.get(CaptureResult.CONTROL_AF_MODE);
+
+            Rect rect = result.get(CaptureResult.SCALER_CROP_REGION);
+            mFocalLengthHelper.setmFocalLength(fl);
+            mFocalLengthHelper.setmFocusDistance(fd);
+            mFocalLengthHelper.setmCropRegion(rect);
+            SizeF sz_focal_length = mFocalLengthHelper.getFocalLengthPixel();
+            String delimiter = ",";
+            StringBuilder sb = new StringBuilder();
+            sb.append(timestamp);
+            sb.append(delimiter + sz_focal_length.getWidth());
+            sb.append(delimiter + sz_focal_length.getHeight());
+            sb.append(delimiter + number);
+            sb.append(delimiter + exposureTimeNs);
+            sb.append(delimiter + frmDurationNs);
+            sb.append(delimiter + frmReadoutNs);
+            sb.append(delimiter + iso);
+            sb.append(delimiter + fl);
+            sb.append(delimiter + fd);
+            sb.append(delimiter + afMode);
+            String frame_info = sb.toString();
+            if (mRecordingMetadata) {
+                try {
+                    mFrameMetadataWriter.write(frame_info + "\n");
+                } catch (IOException err) {
+                    Timber.e(err, "Error writing captureResult");
+                }
+            }
+            ((CameraCaptureActivityBase) mActivity).updateCaptureResultPanel(
+                    sz_focal_length.getWidth(), exposureTimeNs, afMode);
+        }
+
+    };
+
+
     void changeManualFocusPoint(ManualFocusConfig focusConfig) {
         float eventX = focusConfig.mEventX;
         float eventY = focusConfig.mEventY;
@@ -493,28 +589,14 @@ public class Camera2Proxy {
                 halfTouchWidth * 2,
                 halfTouchHeight * 2,
                 MeteringRectangle.METERING_WEIGHT_MAX - 1);
+        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                CameraMetadata.CONTROL_AF_MODE_AUTO);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS,
                 new MeteringRectangle[]{focusAreaTouch});
         try {
+            mState = STATE_WAITING_AUTO;
             mCaptureSession.setRepeatingRequest(
-                    mPreviewRequestBuilder.build(), null, null);
-        } catch (CameraAccessException e) {
-            Timber.e(e);
-        }
-
-        setExposureAndIso();
-
-        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE,
-                CameraMetadata.CONTROL_MODE_AUTO);
-        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                CaptureRequest.CONTROL_AF_MODE_AUTO);
-        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                CameraMetadata.CONTROL_AF_TRIGGER_START);
-
-        try {
-            mCaptureSession.setRepeatingRequest(
-                    mPreviewRequestBuilder.build(),
-                    mSessionCaptureCallback, mBackgroundHandler);
+                    mPreviewRequestBuilder.build(), mFocusCaptureCallback, null);
         } catch (CameraAccessException e) {
             Timber.e(e);
         }

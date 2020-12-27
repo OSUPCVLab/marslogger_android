@@ -233,18 +233,9 @@ class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFra
                         "null ms" :
                         String.format(Locale.getDefault(), "%.2f ms",
                                 exposureTimeNs / 1000000.0);
-        String safMode;
-        switch (afMode) {
-            case CameraMetadata.CONTROL_AF_MODE_OFF:
-                safMode = "AF locked";
-                break;
-            default:
-                safMode = "AF unlocked";
-                break;
-        }
-        final String saf = safMode;
-        runOnUiThread(new Runnable() {
 
+        final String saf = "AF Mode: " + afMode.toString();
+        runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 mCaptureResultText.setText(sfl + " " + sexpotime + " " + saf);
