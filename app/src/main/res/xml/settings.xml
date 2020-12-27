@@ -7,7 +7,7 @@
             android:key="switchManualControl"
             android:summaryOff="Off"
             android:summaryOn="On"
-            android:title="Switch Manual Control" />
+            android:title="Manually Control ISO and Exposure" />
 
 <!--        <ListPreference-->
 <!--            android:key="prefFocusDistance"-->
