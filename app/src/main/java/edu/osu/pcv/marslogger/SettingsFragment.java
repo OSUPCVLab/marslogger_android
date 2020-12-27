@@ -4,7 +4,6 @@ package edu.osu.pcv.marslogger;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -22,12 +21,8 @@ import android.support.v7.preference.PreferenceManager;
 
 import android.util.Range;
 import android.util.Size;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Toast;
 
-import timber.log.Timber;
+import android.widget.Toast;
 
 /**
  * Activities that contain this fragment must implement the
@@ -75,44 +70,42 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-        // Indicate here the XML resource you created above that holds the preferences
         setPreferencesFromResource(R.xml.settings, rootKey);
 
-        // Make it so that we listen to change events
-        PreferenceManager.getDefaultSharedPreferences(getActivity()).registerOnSharedPreferenceChangeListener(this);
+        PreferenceManager.getDefaultSharedPreferences(
+                getActivity()).registerOnSharedPreferenceChangeListener(this);
 
-        // Current prefs, if this is called mid usage, we would want to use this to get our active settings
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
+                getActivity());
 
-        // Get our camera id list preference
-        ListPreference cameraList = (ListPreference) getPreferenceManager().findPreference("prefCamera");
-        ListPreference cameraRez = (ListPreference) getPreferenceManager().findPreference("prefSizeRaw");
-//        ListPreference cameraFocus = (ListPreference) getPreferenceManager().findPreference("prefFocusDistance");
+        ListPreference cameraList = (ListPreference)
+                getPreferenceManager().findPreference("prefCamera");
+        ListPreference cameraRez = (ListPreference)
+                getPreferenceManager().findPreference("prefSizeRaw");
+//        ListPreference cameraFocus = (ListPreference)
+//                getPreferenceManager().findPreference("prefFocusDistance");
 
-        //　get a handle on preferences that require validation
-        EditTextPreference prefISO = (EditTextPreference) getPreferenceScreen().findPreference("prefISO");
-        EditTextPreference prefExposureTime = (EditTextPreference) getPreferenceScreen().findPreference("prefExposureTime");
+        EditTextPreference prefISO = (EditTextPreference)
+                getPreferenceScreen().findPreference("prefISO");
+        EditTextPreference prefExposureTime = (EditTextPreference)
+                getPreferenceScreen().findPreference("prefExposureTime");
 
         prefISO.setOnPreferenceChangeListener(checkISOListener);
         try {
-            // Load our camera settings
             Activity activity = getActivity();
             CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
-            // Our two values we need to update
             int cameraSize = manager.getCameraIdList().length;
             CharSequence[] entries = new CharSequence[cameraSize];
             CharSequence[] entriesValues = new CharSequence[cameraSize];
-            // Loop through our camera list
             for (int i = 0; i < manager.getCameraIdList().length; i++) {
-                // Get the camera
                 String cameraId = manager.getCameraIdList()[i];
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
-                // Try to find what direction it is pointing
                 try {
-                    // Check to see if the camera is facing the back, front, or external
-                    if (characteristics.get(CameraCharacteristics.LENS_FACING) == CameraMetadata.LENS_FACING_BACK) {
+                    if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
+                            CameraMetadata.LENS_FACING_BACK) {
                         entries[i] = cameraId + " - Lens Facing Back";
-                    } else if (characteristics.get(CameraCharacteristics.LENS_FACING) == CameraMetadata.LENS_FACING_FRONT) {
+                    } else if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
+                            CameraMetadata.LENS_FACING_FRONT) {
                         entries[i] = cameraId + " - Lens Facing Front";
                     } else {
                         entries[i] = cameraId + " - Lens External";
@@ -121,7 +114,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
                     e.printStackTrace();
                     entries[i] = cameraId + " - Lens Facing Unknown";
                 }
-                // Set the value to just the camera id
                 entriesValues[i] = cameraId;
             }
 
@@ -134,11 +126,12 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
             // Right now we have selected the first camera, so lets populate the resolution list
             // We should just use the default if there is not a shared setting yet
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(sharedPreferences.getString("prefCamera", entriesValues[0].toString()));
-            StreamConfigurationMap streamConfigurationMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(
+                    sharedPreferences.getString("prefCamera", entriesValues[0].toString()));
+            StreamConfigurationMap streamConfigurationMap = characteristics.get(
+                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             Size[] sizes = streamConfigurationMap.getOutputSizes(MediaRecorder.class);
 
-            // Our new rez entries
             int rezSize = sizes.length;
             CharSequence[] rez = new CharSequence[rezSize];
             CharSequence[] rezValues = new CharSequence[rezSize];
@@ -153,7 +146,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 }
             }
 
-            // Update our settings entry
             cameraRez.setEntries(rez);
             cameraRez.setEntryValues(rezValues);
             cameraRez.setDefaultValue(rezValues[defaultIndex]);
@@ -172,13 +164,14 @@ public class SettingsFragment extends PreferenceFragmentCompat
                         new Float(exposureTimeRangeNs.getLower().floatValue() / 1e6),
                         new Float(exposureTimeRangeNs.getUpper().floatValue() / 1e6));
                 String rangeStr = "[" + exposureTimeRangeMs.getLower() + "," +
-                    exposureTimeRangeMs.getUpper() + "] (ms)";
+                        exposureTimeRangeMs.getUpper() + "] (ms)";
                 prefExposureTime.setDialogTitle("Adjust exposure time in range " + rangeStr);
             }
 
             // Get the possible focus lengths, on non-optical devices this only has one value
             // https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#LENS_INFO_AVAILABLE_FOCAL_LENGTHS
-            float[] focus_lengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
+            float[] focus_lengths = characteristics.get(
+                    CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
             CharSequence[] focuses = new CharSequence[focus_lengths.length];
             for (int i = 0; i < focus_lengths.length; i++) {
                 focuses[i] = focus_lengths[i] + "";
@@ -197,7 +190,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
      * Checks that a preference is a valid numerical value
      */
     Preference.OnPreferenceChangeListener checkISOListener = new Preference.OnPreferenceChangeListener() {
-
         @Override
         public boolean onPreferenceChange(Preference preference, Object newValue) {
             //Check that the string is an integer.
@@ -206,38 +198,34 @@ public class SettingsFragment extends PreferenceFragmentCompat
     };
 
     private boolean checkIso(Object newValue) {
-        if( !newValue.toString().equals("")  &&  newValue.toString().matches("\\d*") ) {
+        if (!newValue.toString().equals("") && newValue.toString().matches("\\d*")) {
             return true;
-        }
-        else {
-            Toast.makeText(getActivity(), newValue+" is not a valid number!", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(getActivity(),
+                    newValue + " is not a valid number!", Toast.LENGTH_SHORT).show();
             return false;
         }
     }
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-//         Add the listener to the camera pref, so we can update the camera resolution field
         if (key.equals("prefCamera")) {
             try {
-                // Get what camera we have selected
                 String cameraId = sharedPreferences.getString("prefCamera", "0");
 
-                // Load our camera settings
                 Activity activity = getActivity();
-                CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
+                CameraManager manager = (CameraManager)
+                        activity.getSystemService(Context.CAMERA_SERVICE);
 
-                // Right now we have selected the first camera, so lets populate the resolution list
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
-                StreamConfigurationMap streamConfigurationMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                StreamConfigurationMap streamConfigurationMap = characteristics.get(
+                        CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                 Size[] sizes = streamConfigurationMap.getOutputSizes(MediaRecorder.class);
 
-                // Our new rez entries
                 int rezSize = sizes.length;
                 CharSequence[] rez = new CharSequence[rezSize];
                 CharSequence[] rezValues = new CharSequence[rezSize];
                 int defaultIndex = 0;
-                // Loop through and create our entries
                 for (int i = 0; i < sizes.length; i++) {
                     rez[i] = sizes[i].getWidth() + "x" + sizes[i].getHeight();
                     rezValues[i] = sizes[i].getWidth() + "x" + sizes[i].getHeight();
@@ -248,15 +236,14 @@ public class SettingsFragment extends PreferenceFragmentCompat
                     }
                 }
 
-                // Update our settings entry
-                ListPreference cameraRez = (ListPreference) getPreferenceManager().findPreference("prefSizeRaw");
+                ListPreference cameraRez = (ListPreference)
+                        getPreferenceManager().findPreference("prefSizeRaw");
                 cameraRez.setEntries(rez);
                 cameraRez.setEntryValues(rezValues);
                 cameraRez.setValueIndex(defaultIndex);
 
-                // Get the possible focus lengths, on non-optical devices this only has one value
-                // https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#LENS_INFO_AVAILABLE_FOCAL_LENGTHS
-                float[] focus_lengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
+                float[] focus_lengths = characteristics.get(
+                        CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
                 CharSequence[] focuses = new CharSequence[focus_lengths.length];
                 for (int i = 0; i < focus_lengths.length; i++) {
                     focuses[i] = focus_lengths[i] + "";
@@ -306,7 +293,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
      * >Communicating with Other Fragments</a> for more information.
      */
     public interface OnFragmentInteractionListener {
-        // TODO: Update argument type and name
         void onFragmentInteraction(Uri uri);
     }
 }

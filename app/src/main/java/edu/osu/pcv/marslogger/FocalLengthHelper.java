@@ -1,7 +1,6 @@
 package edu.osu.pcv.marslogger;
 
 // estimate focal length, i.e., imaging distance in pixels, using all sorts of info
-// TODO(jhuai): set default imaging distance using empirical data, see colmap
 
 import android.annotation.TargetApi;
 import android.graphics.Rect;
