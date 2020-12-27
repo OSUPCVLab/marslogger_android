@@ -9,10 +9,10 @@
             android:summaryOn="On"
             android:title="Switch Manual Control" />
 
-        <ListPreference
-            android:key="prefFocusDistance"
-            android:title="Adjust Focus Distances"
-            android:summary="Lock the focus distance (mm) before tap to focus" />
+<!--        <ListPreference-->
+<!--            android:key="prefFocusDistance"-->
+<!--            android:title="Adjust Focus Distances"-->
+<!--            android:summary="Lock the focus distance (mm) before tap to focus" />-->
 
         <EditTextPreference
             android:key="prefISO"
