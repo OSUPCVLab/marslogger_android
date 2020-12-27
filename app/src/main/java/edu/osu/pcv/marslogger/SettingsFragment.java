@@ -128,7 +128,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             // Update our settings entry
             cameraList.setEntries(entries);
             cameraList.setEntryValues(entriesValues);
-            cameraList.setValueIndex(0);
+            cameraList.setDefaultValue(entriesValues[0]);
+            // Do not call "cameraList.setValueIndex(0)" which will invoke onSharedPreferenceChanged
+            // if the previous camera is not 0, and cause null pointer exception.
 
             // Right now we have selected the first camera, so lets populate the resolution list
             // We should just use the default if there is not a shared setting yet
@@ -154,7 +156,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             // Update our settings entry
             cameraRez.setEntries(rez);
             cameraRez.setEntryValues(rezValues);
-            cameraRez.setValueIndex(defaultIndex);
+            cameraRez.setDefaultValue(rezValues[defaultIndex]);
 
             isoRange = characteristics.get(
                     CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
