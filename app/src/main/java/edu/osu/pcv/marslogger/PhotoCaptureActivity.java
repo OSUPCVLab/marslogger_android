@@ -92,9 +92,9 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
             mGLView.setRenderer(mRenderer);
             mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         }
-        mGLView.setTouchListener((event, width, height) -> {
+        mGLView.setTouchListener((event) -> {
             ManualFocusConfig focusConfig =
-                    new ManualFocusConfig(event.getX(), event.getY(), width, height);
+                    new ManualFocusConfig(event.getX(), event.getY(), mGLView.getWidth(), mGLView.getHeight());
             Timber.d(focusConfig.toString());
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));

@@ -10,7 +10,7 @@ import android.view.View;
  * Created by sudamasayuki on 2018/03/14.
  */
 
-public class SampleGLView extends GLSurfaceView implements View.OnTouchListener {
+public class SampleGLView extends GLSurfaceView {
 
     public SampleGLView(Context context) {
         this(context, null);
@@ -18,26 +18,24 @@ public class SampleGLView extends GLSurfaceView implements View.OnTouchListener 
 
     public SampleGLView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        setOnTouchListener(this);
     }
 
     private TouchListener touchListener;
 
     @Override
-    public boolean onTouch(View v, MotionEvent event) {
+    public boolean onTouchEvent(MotionEvent event) {
         final int actionMasked = event.getActionMasked();
         if (actionMasked != MotionEvent.ACTION_DOWN) {
             return false;
         }
-
         if (touchListener != null) {
-            touchListener.onTouch(event, v.getWidth(), v.getHeight());
+            touchListener.onTouch(event);
         }
         return false;
     }
 
     public interface TouchListener {
-        void onTouch(MotionEvent event, int width, int height);
+        void onTouch(MotionEvent event);
     }
 
     public void setTouchListener(TouchListener touchListener) {

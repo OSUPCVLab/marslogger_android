@@ -43,6 +43,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -334,10 +335,11 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mGLView.setRenderer(mRenderer);
             mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         }
-        mGLView.setTouchListener((event, width, height) -> {
+        mGLView.setTouchListener((event) -> {
             ManualFocusConfig focusConfig =
-                    new ManualFocusConfig(event.getX(), event.getY(), width, height);
+                    new ManualFocusConfig(event.getX(), event.getY(), mGLView.getWidth(), mGLView.getHeight());
             Timber.d(focusConfig.toString());
+            Toast.makeText(getApplicationContext(), "Changing focus point...", Toast.LENGTH_SHORT).show();
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
