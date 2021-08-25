@@ -24,6 +24,10 @@ import android.util.Size;
 
 import android.widget.Toast;
 
+import java.util.Arrays;
+
+import timber.log.Timber;
+
 /**
  * Activities that contain this fragment must implement the
  * {@link SettingsFragment.OnFragmentInteractionListener} interface
@@ -97,18 +101,20 @@ public class SettingsFragment extends PreferenceFragmentCompat
             int cameraSize = manager.getCameraIdList().length;
             CharSequence[] entries = new CharSequence[cameraSize];
             CharSequence[] entriesValues = new CharSequence[cameraSize];
-            for (int i = 0; i < manager.getCameraIdList().length; i++) {
+            for (int i = 0; i < cameraSize; i++) {
                 String cameraId = manager.getCameraIdList()[i];
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
                 try {
+                    boolean isLogicalCamera = CameraUtils.isLogicalCamera(characteristics);
+                    String prefix = isLogicalCamera ? " - Logical" : " - Physical";
                     if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_BACK) {
-                        entries[i] = cameraId + " - Lens Facing Back";
+                        entries[i] = cameraId + prefix + " Lens Facing Back";
                     } else if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_FRONT) {
-                        entries[i] = cameraId + " - Lens Facing Front";
+                        entries[i] = cameraId + prefix + " Lens Facing Front";
                     } else {
-                        entries[i] = cameraId + " - Lens External";
+                        entries[i] = cameraId + prefix + " Lens External";
                     }
                 } catch (NullPointerException e) {
                     e.printStackTrace();

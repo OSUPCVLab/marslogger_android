@@ -140,6 +140,17 @@ public class CameraUtils {
         return rearCameraId;
     }
 
+    public static boolean isLogicalCamera(CameraCharacteristics characteristics) {
+        boolean isLogicalCamera = false;
+        int[] capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+        for (int element : capabilities) {
+            if (element == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
+                isLogicalCamera = true;
+            }
+        }
+        return isLogicalCamera;
+    }
+
     public static int calcBitRate(int width, int height, int frame_rate) {
         final int bitrate = (int) (BPP * frame_rate * width * height);
         Timber.i("bitrate=%d", bitrate);

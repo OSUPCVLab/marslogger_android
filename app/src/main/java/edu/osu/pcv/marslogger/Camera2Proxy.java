@@ -1,7 +1,6 @@
 package edu.osu.pcv.marslogger;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -18,10 +17,13 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.MeteringRectangle;
+import android.hardware.camera2.params.OutputConfiguration;
+import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.preference.PreferenceManager;
@@ -41,6 +43,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import timber.log.Timber;
 
@@ -55,6 +60,7 @@ public class Camera2Proxy {
     private Size mVideoSize;
     private CameraManager mCameraManager;
     private CameraCharacteristics mCameraCharacteristics;
+    private Set<String> mPhysicalCameraIds;
     private CameraDevice mCameraDevice;
     private CameraCaptureSession mCaptureSession;
     private CaptureRequest.Builder mPreviewRequestBuilder;
@@ -208,6 +214,9 @@ public class Camera2Proxy {
         try {
             mCameraIdStr = mSharedPreferences.getString("prefCamera", "0");
             mCameraCharacteristics = mCameraManager.getCameraCharacteristics(mCameraIdStr);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                mPhysicalCameraIds = mCameraCharacteristics.getPhysicalCameraIds();
+            }
 
             String imageSize = mSharedPreferences.getString("prefSizeRaw",
                     DesiredCameraSetting.mDesiredFrameSize);
@@ -398,21 +407,43 @@ public class Camera2Proxy {
             surfaces.add(mPreviewSurface);
             mPreviewRequestBuilder.addTarget(mPreviewSurface);
 
-            mCameraDevice.createCaptureSession(surfaces,
-                    new CameraCaptureSession.StateCallback() {
+            CameraCaptureSession.StateCallback captureStateCallback = new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(@NonNull CameraCaptureSession session) {
+                    mCaptureSession = session;
+                    mPreviewRequest = mPreviewRequestBuilder.build();
+                    startPreview();
+                }
 
-                        @Override
-                        public void onConfigured(@NonNull CameraCaptureSession session) {
-                            mCaptureSession = session;
-                            mPreviewRequest = mPreviewRequestBuilder.build();
-                            startPreview();
-                        }
+                @Override
+                public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                    Timber.w("ConfigureFailed. session: mCaptureSession");
+                }
+            };
 
-                        @Override
-                        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-                            Timber.w("ConfigureFailed. session: mCaptureSession");
-                        }
-                    }, mBackgroundHandler);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                List<OutputConfiguration> outputConfigs = new ArrayList<>();
+                for (Surface surface : surfaces) {
+                    OutputConfiguration config = new OutputConfiguration(surface);
+                    if (!mPhysicalCameraIds.isEmpty()) {
+                        // As a rule of thumb, we assume that normal camera at index 0, wide angle lens at index 1.
+                        // TODO(jhuai): choose wide angles lens by checking the camera characteristics as in Basicbokeh.
+                        String physicalCameraId = (String) mPhysicalCameraIds.toArray()[1];
+                        config.setPhysicalCameraId(physicalCameraId);
+                    }
+                    outputConfigs.add(config);
+                }
+                ExecutorService executor = Executors.newCachedThreadPool();
+                SessionConfiguration sessionConfig = new SessionConfiguration(
+                        SessionConfiguration.SESSION_REGULAR,
+                        outputConfigs,
+                        executor,
+                        captureStateCallback);
+                mCameraDevice.createCaptureSession(sessionConfig);
+            } else {
+                mCameraDevice.createCaptureSession(surfaces,
+                        captureStateCallback, mBackgroundHandler);
+            }
         } catch (CameraAccessException e) {
             Timber.e(e);
         }
