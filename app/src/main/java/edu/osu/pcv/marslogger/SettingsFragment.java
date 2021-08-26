@@ -25,6 +25,7 @@ import android.util.Size;
 import android.widget.Toast;
 
 import java.util.Arrays;
+import java.util.Set;
 
 import timber.log.Timber;
 
@@ -105,16 +106,21 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 String cameraId = manager.getCameraIdList()[i];
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
                 try {
-                    boolean isLogicalCamera = CameraUtils.isLogicalCamera(characteristics);
-                    String prefix = isLogicalCamera ? " - Logical" : " - Physical";
+                    Set<String> physicalCameraIds = CameraUtils.getPhysicalCameraIds(characteristics);
+                    String prefix = " - Physical";
+                    String suffix = "";
+                    if (!physicalCameraIds.isEmpty()) {
+                        prefix = " - Logical";
+                        suffix = " " + physicalCameraIds.toString();
+                    }
                     if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_BACK) {
-                        entries[i] = cameraId + prefix + " Lens Facing Back";
+                        entries[i] = cameraId + prefix + " Lens Facing Back" + suffix;
                     } else if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_FRONT) {
-                        entries[i] = cameraId + prefix + " Lens Facing Front";
+                        entries[i] = cameraId + prefix + " Lens Facing Front" + suffix;
                     } else {
-                        entries[i] = cameraId + prefix + " Lens External";
+                        entries[i] = cameraId + prefix + " Lens External" + suffix;
                     }
                 } catch (NullPointerException e) {
                     e.printStackTrace();

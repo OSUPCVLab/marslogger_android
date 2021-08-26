@@ -20,12 +20,15 @@ import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.os.Build;
 import android.util.Size;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import timber.log.Timber;
 
@@ -141,14 +144,29 @@ public class CameraUtils {
     }
 
     public static boolean isLogicalCamera(CameraCharacteristics characteristics) {
-        boolean isLogicalCamera = false;
+        boolean logical = false;
         int[] capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
         for (int element : capabilities) {
             if (element == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
-                isLogicalCamera = true;
+                logical = true;
+                break;
             }
         }
-        return isLogicalCamera;
+        return logical;
+    }
+
+    public static Set<String> getPhysicalCameraIds(CameraCharacteristics characteristics) {
+        Set<String> physicalCameraIds = new HashSet<String>();
+        int[] capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+        for (int element : capabilities) {
+            if (element == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    physicalCameraIds = characteristics.getPhysicalCameraIds();
+                }
+                break;
+            }
+        }
+        return physicalCameraIds;
     }
 
     public static int calcBitRate(int width, int height, int frame_rate) {
