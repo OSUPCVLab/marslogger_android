@@ -1,16 +1,14 @@
 package edu.osu.pcv.marslogger;
 
-import android.support.v7.widget.RecyclerView;
-import android.text.Html;
+import androidx.recyclerview.widget.RecyclerView;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 
 import edu.osu.pcv.marslogger.ImuViewFragment.OnListFragmentInteractionListener;
 import edu.osu.pcv.marslogger.ImuViewContent.SingleAxis;
-import timber.log.Timber;
 
 import java.util.List;
 

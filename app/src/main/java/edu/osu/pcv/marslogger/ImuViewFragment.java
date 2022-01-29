@@ -5,18 +5,24 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
-import android.support.v4.app.Fragment;
-import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+
+import androidx.core.util.Consumer;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
+
+import com.marslogger.locationprovider.LocationProvider;
 
 import edu.osu.pcv.marslogger.ImuViewContent.SingleAxis;
 
@@ -46,6 +52,8 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
         }
     }
     private HandlerThread mSensorThread;
+    private LocationProvider locationProvider;
+    private Location currLocation;
 
     /**
      * Mandatory empty constructor for the fragment manager to instantiate the
@@ -76,6 +84,11 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
         mAccel = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER); // warn: mAccel can be null.
         mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE); // warn: mGyro can be null.
         mMag = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        locationProvider = new LocationProvider(getActivity());
+        locationProvider.createLocationListener(location -> {
+            currLocation = location;
+            Log.d("fragment", "does this change?");
+        });
     }
 
     @Override
@@ -167,6 +180,14 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
                 mAdapter.updateListItem(i + 6, sp.values[i]);
             }
         }
+        if (currLocation != null) {
+            Log.d("fragment", "latitude is " + currLocation.getLatitude());
+            Log.d("fragment", "longitude is " + currLocation.getLongitude());
+            Log.d("fragment", "altitude is " + currLocation.getAltitude());
+            mAdapter.updateListItem(9, (float) currLocation.getLatitude());
+            mAdapter.updateListItem(10, (float) currLocation.getLongitude());
+            mAdapter.updateListItem(11, (float) currLocation.getAltitude());
+        }
         getActivity().runOnUiThread(new Runnable(){
             public void run() {
                 mAdapter.notifyDataSetChanged();
@@ -201,5 +222,6 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
         mSensorManager.unregisterListener(this, mMag);
         mSensorManager.unregisterListener(this);
         mSensorThread.quitSafely();
+        locationProvider.quitThread();
     }
 }

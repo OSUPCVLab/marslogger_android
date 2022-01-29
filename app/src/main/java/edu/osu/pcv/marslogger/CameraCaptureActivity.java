@@ -17,10 +17,8 @@
 package edu.osu.pcv.marslogger;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.SurfaceTexture;
-import android.hardware.camera2.CameraMetadata;
 
 import android.opengl.EGL14;
 import android.opengl.GLES20;
@@ -31,7 +29,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 
-import android.support.annotation.RequiresApi;
+import androidx.annotation.RequiresApi;
 import android.util.Size;
 import android.view.Display;
 import android.view.Surface;

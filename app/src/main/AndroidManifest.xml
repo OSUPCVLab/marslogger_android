@@ -28,7 +28,8 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat">
         </activity>
-        <activity android:name=".MainActivity">
+        <activity android:name=".MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.MAIN" />
