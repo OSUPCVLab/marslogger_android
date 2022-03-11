@@ -53,7 +53,6 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
     }
     private HandlerThread mSensorThread;
     private LocationProvider locationProvider;
-    private Location currLocation;
 
     /**
      * Mandatory empty constructor for the fragment manager to instantiate the
@@ -84,11 +83,8 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
         mAccel = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER); // warn: mAccel can be null.
         mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE); // warn: mGyro can be null.
         mMag = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        locationProvider = new LocationProvider(getActivity());
-        locationProvider.createLocationListener(location -> {
-            currLocation = location;
-            Log.d("fragment", "does this change?");
-        });
+        locationProvider = new LocationProvider(getActivity(), null);
+        locationProvider.createLocationListener();
     }
 
     @Override
@@ -180,13 +176,11 @@ public class ImuViewFragment extends Fragment implements SensorEventListener {
                 mAdapter.updateListItem(i + 6, sp.values[i]);
             }
         }
+        Location currLocation = locationProvider.getCurrLocation();
         if (currLocation != null) {
-            Log.d("fragment", "latitude is " + currLocation.getLatitude());
-            Log.d("fragment", "longitude is " + currLocation.getLongitude());
-            Log.d("fragment", "altitude is " + currLocation.getAltitude());
-            mAdapter.updateListItem(9, (float) currLocation.getLatitude());
-            mAdapter.updateListItem(10, (float) currLocation.getLongitude());
-            mAdapter.updateListItem(11, (float) currLocation.getAltitude());
+            mAdapter.updateListItemFull(9, (float) currLocation.getLatitude());
+            mAdapter.updateListItemFull(10, (float) currLocation.getLongitude());
+            mAdapter.updateListItemFull(11, (float) currLocation.getAltitude());
         }
         getActivity().runOnUiThread(new Runnable(){
             public void run() {

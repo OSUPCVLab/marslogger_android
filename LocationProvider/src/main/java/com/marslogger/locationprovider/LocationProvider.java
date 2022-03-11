@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.HandlerThread;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -15,6 +16,8 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+
+import java.util.LinkedHashMap;
 
 public class LocationProvider {
 
@@ -29,29 +32,42 @@ public class LocationProvider {
     private static final int DEFAULT_UPDATE_INTERVAL = 1;
     private static final int FAST_UPDATE_INTERVAL = 1;
 
-    public LocationProvider(Context context) {
+    // to consume locations other than the latest one
+    private final Consumer<Location> consumer;
+
+    public LocationProvider(Context context, Consumer<Location> consumer) {
         this.context = context;
+        this.consumer = consumer;
     }
 
-    public void createLocationListener(Consumer<Location> locationConsumer) {
+    // the most recent location
+    private Location currLocation;
+
+    public Location getCurrLocation() {
+        return currLocation;
+    }
+
+    public void createLocationListener() {
         locationThread = new HandlerThread("locationThread");
         locationThread.start();
         LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setInterval(500);
-        locationRequest.setFastestInterval(500);
+        locationRequest.setInterval(1000 * DEFAULT_UPDATE_INTERVAL);
+        locationRequest.setFastestInterval(1000 * FAST_UPDATE_INTERVAL);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(context);
 
         // check if you have permission before trying to get the location
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED) {
-            fusedLocationClient.getLastLocation().addOnSuccessListener(locationConsumer::accept);
+        int fineLocationPermissionCode = ActivityCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+        );
+        int coarseLocationPermissionCode = ActivityCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_COARSE_LOCATION
+        );
+        if (fineLocationPermissionCode == PackageManager.PERMISSION_GRANTED
+                && coarseLocationPermissionCode == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(location -> currLocation = location);
         }
 
         // triggered whenever the location is updated
@@ -59,7 +75,13 @@ public class LocationProvider {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
                 super.onLocationResult(locationResult);
-                locationConsumer.accept(locationResult.getLastLocation());
+                if (consumer != null) {
+                    Log.d("something", "locations " + locationResult.getLocations().size());
+                    for (Location location : locationResult.getLocations()) {
+                        consumer.accept(location);
+                    }
+                }
+                currLocation = locationResult.getLastLocation();
             }
         };
         fusedLocationClient.requestLocationUpdates(

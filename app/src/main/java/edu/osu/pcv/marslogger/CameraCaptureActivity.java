@@ -288,6 +288,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private boolean mRecordingEnabled;      // controls button state
 
     private IMUManager mImuManager;
+    private GPSManager mGpsManager;
     private TimeBaseManager mTimeBaseManager;
 
     @Override
@@ -341,9 +342,12 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
-        if (mImuManager == null) {
-            mImuManager = new IMUManager(this);
-            mTimeBaseManager = new TimeBaseManager();
+        if (mGpsManager == null) {
+            mGpsManager = new GPSManager(this);
+            if (mImuManager == null) {
+                mImuManager = new IMUManager(this, mGpsManager);
+                mTimeBaseManager = new TimeBaseManager();
+            }
         }
         mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
@@ -440,14 +444,18 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mOutputDirText.setText(basename);
             mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
+            String gpsFile = outputDir + File.separator + "gps.csv";
+            String allGpsFile = outputDir + File.separator + "all_gps.csv";
             String edgeEpochFile = outputDir + File.separator + "edge_epochs.txt";
             mTimeBaseManager.startRecording(edgeEpochFile, mCamera2Proxy.getmTimeSourceValue());
+            mGpsManager.startRecording(gpsFile, allGpsFile);
             mImuManager.startRecording(inertialFile);
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
+            mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();
         }
         mGLView.queueEvent(new Runnable() {

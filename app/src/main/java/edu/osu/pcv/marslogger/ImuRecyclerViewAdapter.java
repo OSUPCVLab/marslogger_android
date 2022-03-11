@@ -69,6 +69,12 @@ public class ImuRecyclerViewAdapter extends RecyclerView.Adapter<ImuRecyclerView
         mValues.get(position).content = String.format("%.3f", value);
     }
 
+    // this is used to show gps values as their values show changes for the very last decimal values
+    // unlike the imu values
+    public void updateListItemFull(int position, float value) {
+        mValues.get(position).content = String.valueOf(value);
+    }
+
     public class ViewHolder extends RecyclerView.ViewHolder {
         public final View mView;
         public final TextView mIdView;
