@@ -1,16 +1,14 @@
 package edu.osu.pcv.marslogger;
 
-import android.support.v7.widget.RecyclerView;
-import android.text.Html;
+import androidx.recyclerview.widget.RecyclerView;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 
 import edu.osu.pcv.marslogger.ImuViewFragment.OnListFragmentInteractionListener;
 import edu.osu.pcv.marslogger.ImuViewContent.SingleAxis;
-import timber.log.Timber;
 
 import java.util.List;
 
@@ -69,6 +67,12 @@ public class ImuRecyclerViewAdapter extends RecyclerView.Adapter<ImuRecyclerView
      */
     public void updateListItem(int position, float value) {
         mValues.get(position).content = String.format("%.3f", value);
+    }
+
+    // this is used to show gps values as their values show changes for the very last decimal values
+    // unlike the imu values
+    public void updateListItemFull(int position, float value) {
+        mValues.get(position).content = String.valueOf(value);
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {

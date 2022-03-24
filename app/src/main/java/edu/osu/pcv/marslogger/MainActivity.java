@@ -4,11 +4,11 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import android.os.Bundle;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -20,7 +20,9 @@ import timber.log.Timber;
 public class MainActivity extends Activity implements Eula.OnEulaAgreedTo {
 
     private static final String[] REQUIRED_SDK_PERMISSIONS = new String[] {
-            Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE };
+            Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION};
     
     private final static int REQUEST_CODE_ASK_PERMISSIONS = 5947;
     

@@ -11,13 +11,15 @@ import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.MediaRecorder;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
-import android.support.v7.preference.EditTextPreference;
-import android.support.v7.preference.ListPreference;
-import android.support.v7.preference.Preference;
-import android.support.v7.preference.PreferenceFragmentCompat;
-import android.support.v7.preference.PreferenceManager;
+import androidx.annotation.RequiresApi;
+import androidx.preference.EditTextPreference;
+import androidx.preference.ListPreference;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
 
 import android.util.Range;
 import android.util.Size;
@@ -68,6 +70,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         super.onDestroy();
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.R)
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.settings, rootKey);
@@ -100,6 +103,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             for (int i = 0; i < manager.getCameraIdList().length; i++) {
                 String cameraId = manager.getCameraIdList()[i];
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+                Toast.makeText(getContext(), "zoom range " + characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE), Toast.LENGTH_LONG).show();
                 try {
                     if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_BACK) {

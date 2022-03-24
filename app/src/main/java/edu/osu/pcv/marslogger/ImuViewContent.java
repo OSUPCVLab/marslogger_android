@@ -39,6 +39,13 @@ public class ImuViewContent {
                 "Y axis of magnetometer", "&mu T"));
         addItem(new SingleAxis("Mag Z", String.valueOf(0.0),
                 "Z axis of magnetometer", "&mu T"));
+
+        addItem(new SingleAxis("Latitude", String.valueOf(0.0),
+                "Gps Latitude", "degrees"));
+        addItem(new SingleAxis("Longitude", String.valueOf(0.0),
+                "Gps Latitude", "degrees"));
+        addItem(new SingleAxis("Altitude", String.valueOf(0.0),
+                "Gps Latitude", "degrees"));
     }
 
     private static void addItem(SingleAxis item) {
