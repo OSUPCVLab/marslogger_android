@@ -103,7 +103,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
             for (int i = 0; i < manager.getCameraIdList().length; i++) {
                 String cameraId = manager.getCameraIdList()[i];
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
-                Toast.makeText(getContext(), "zoom range " + characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE), Toast.LENGTH_LONG).show();
                 try {
                     if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_BACK) {

@@ -56,7 +56,6 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
 
     private TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
     private IMUManager mImuManager;
-    private GPSManager mGpsManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,11 +99,8 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
-        if (mGpsManager == null) {
-            mGpsManager = new GPSManager(this);
-            if (mImuManager == null) {
-                mImuManager = new IMUManager(this, mGpsManager);
-            }
+        if (mImuManager == null) {
+            mImuManager = new IMUManager(this);
         }
         mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);

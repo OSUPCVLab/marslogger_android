@@ -7,20 +7,15 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.location.Location;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
 import android.preference.PreferenceManager;
-import android.util.Log;
-
-import com.marslogger.locationprovider.LocationProvider;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.Iterator;
 
@@ -33,9 +28,6 @@ public class IMUManager implements SensorEventListener {
     // is used instead of linear interpolation
     private final long mInterpolationTimeResolution = 500; // nanoseconds
     private int mSensorRate = SensorManager.SENSOR_DELAY_FASTEST;
-
-    // needed to synchronize gps and imu values for the same timestamp
-    private final GPSManager gpsManager;
 
     public static String ImuHeader = "Timestamp[nanosec],gx[rad/s],gy[rad/s],gz[rad/s]," +
             "ax[m/s^2],ay[m/s^2],az[m/s^2],Unix time[nanosec]\n";
@@ -79,8 +71,7 @@ public class IMUManager implements SensorEventListener {
     private Deque<SensorPacket> mGyroData = new ArrayDeque<>();
     private Deque<SensorPacket> mAccelData = new ArrayDeque<>();
 
-    public IMUManager(Activity activity, GPSManager gpsManager) {
-        this.gpsManager = gpsManager;
+    public IMUManager(Activity activity) {
         mSensorManager = (SensorManager) activity.getSystemService(Context.SENSOR_SERVICE);
         mAccel = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
@@ -214,28 +205,11 @@ public class IMUManager implements SensorEventListener {
             mGyroData.add(sp);
             SensorPacket syncedData = syncInertialData();
 
-            boolean recordImuAndGps = mRecordingInertialData && gpsManager.ismRecordingGpsData();
-
-            // record both imu and gps data
-            if (recordImuAndGps) {
-                if (syncedData != null && mRecordingInertialData) {
-                    try {
-                        if (gpsManager.recordGpsValue(syncedData.timestamp, unixTime)) {
-                            mDataWriter.write(syncedData.toString() + "\n");
-                        }
-                    } catch (IOException ioe) {
-                        Timber.e(ioe);
-                    }
-                }
-            }
-            // only record imu data if app is unable to create location listener for phone
-            else {
-                if (syncedData != null && mRecordingInertialData) {
-                    try {
-                        mDataWriter.write(syncedData.toString() + "\n");
-                    } catch (IOException ioe) {
-                        Timber.e(ioe);
-                    }
+            if (syncedData != null && mRecordingInertialData) {
+                try {
+                    mDataWriter.write(syncedData.toString() + "\n");
+                } catch (IOException ioe) {
+                    Timber.e(ioe);
                 }
             }
         }
@@ -267,7 +241,6 @@ public class IMUManager implements SensorEventListener {
         mSensorManager.unregisterListener(this, mGyro);
         mSensorManager.unregisterListener(this);
         mSensorThread.quitSafely();
-        gpsManager.unregister();
         stopRecording();
     }
 }

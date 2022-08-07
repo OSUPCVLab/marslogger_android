@@ -344,10 +344,10 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         });
         if (mGpsManager == null) {
             mGpsManager = new GPSManager(this);
-            if (mImuManager == null) {
-                mImuManager = new IMUManager(this, mGpsManager);
-                mTimeBaseManager = new TimeBaseManager();
-            }
+        }
+        if (mImuManager == null) {
+            mImuManager = new IMUManager(this);
+            mTimeBaseManager = new TimeBaseManager();
         }
         mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
