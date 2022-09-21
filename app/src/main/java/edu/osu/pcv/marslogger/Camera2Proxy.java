@@ -17,10 +17,13 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.MeteringRectangle;
+import android.hardware.camera2.params.OutputConfiguration;
+import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.preference.PreferenceManager;
@@ -40,6 +43,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import timber.log.Timber;
 
@@ -54,6 +60,10 @@ public class Camera2Proxy {
     private Size mVideoSize;
     private CameraManager mCameraManager;
     private CameraCharacteristics mCameraCharacteristics;
+    private Set<String> mPhysicalCameraIds;
+    private List<Integer> mZoomRatios;
+    private int mMaxZoomIndex;
+    private Rect mScalarCropRegion;
     private CameraDevice mCameraDevice;
     private CameraCaptureSession mCaptureSession;
     private CaptureRequest.Builder mPreviewRequestBuilder;
@@ -203,11 +213,85 @@ public class Camera2Proxy {
         };
     }
 
+    /**
+     * This function requires mCameraCharacteristics.
+     * Refer to setZoom() in OpenCamera,
+     * https://github.com/AntumDeluge/Open_Camera/blob/master/app/src/main/java/
+     * net/sourceforge/opencamera/cameracontroller/CameraController2.java
+     * @param value
+     */
+    public void computeZoomRegion(int value) {
+        if (mZoomRatios == null) {
+            Timber.d("zoom not supported");
+            return;
+        }
+        if (value < 0 || value > mZoomRatios.size()) {
+            Timber.e("invalid zoom value %d", value);
+            throw new RuntimeException(); // throw as RuntimeException, as this is a programming error
+        }
+        float zoom = mZoomRatios.get(value) / 100.0f;
+        Rect sensor_rect = mCameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+        int left = sensor_rect.width() / 2;
+        int right = left;
+        int top = sensor_rect.height() / 2;
+        int bottom = top;
+        int hwidth = (int) (sensor_rect.width() / (2.0 * zoom));
+        int hheight = (int) (sensor_rect.height() / (2.0 * zoom));
+        left -= hwidth;
+        right += hwidth;
+        top -= hheight;
+        bottom += hheight;
+
+        Timber.d("zoom: %f\nhwidth: %d\nhheight: %d\n" +
+                        "sensor_rect left: %d\nsensor_rect top: %d\n" +
+                        "sensor_rect right: %d\nsensor_rect bottom: %d\n" +
+                        "left: %d\ntop: %d\nright: %d\nbottom: %d",
+                zoom, hwidth, hheight,
+                sensor_rect.left, sensor_rect.top, sensor_rect.right, sensor_rect.bottom,
+                left, top, right, bottom);
+        mScalarCropRegion = new Rect(left, top, right, bottom);
+    }
+
+    /**
+     * This function requires mCameraCharacteristics.
+     * @param value
+     */
+    private void computeZoomRatios() {
+        float max_zoom = mCameraCharacteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+        boolean is_zoom_supported = max_zoom > 0.0f;
+        Timber.d("max_zoom: " + max_zoom);
+        if( is_zoom_supported ) {
+            // set 20 steps per 2x factor
+            final int steps_per_2x_factor = 20;
+            //final double scale_factor = Math.pow(2.0, 1.0/(double)steps_per_2x_factor);
+            int n_steps =(int)( (steps_per_2x_factor * Math.log(max_zoom + 1.0e-11)) / Math.log(2.0));
+            final double scale_factor = Math.pow(max_zoom, 1.0/(double)n_steps);
+            Timber.d("n_steps: %d\nscale_factor: %f", n_steps, scale_factor);
+
+            mZoomRatios = new ArrayList<>();
+            mZoomRatios.add(100);
+            double zoom = 1.0;
+            for(int i=0;i<n_steps-1;i++) {
+                zoom *= scale_factor;
+                mZoomRatios.add((int)(zoom*100));
+            }
+            mZoomRatios.add((int)(max_zoom*100));
+            mMaxZoomIndex = mZoomRatios.size()-1;
+        }
+        else {
+            mZoomRatios = null;
+        }
+    }
+
     public Size configureCamera() {
         try {
             mCameraIdStr = mSharedPreferences.getString("prefCamera", "0");
             mCameraCharacteristics = mCameraManager.getCameraCharacteristics(mCameraIdStr);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                mPhysicalCameraIds = mCameraCharacteristics.getPhysicalCameraIds();
+            }
 
+            computeZoomRatios();
             String imageSize = mSharedPreferences.getString("prefSizeRaw",
                     DesiredCameraSetting.mDesiredFrameSize);
             int width = Integer.parseInt(imageSize.substring(0, imageSize.lastIndexOf("x")));
@@ -369,6 +453,16 @@ public class Camera2Proxy {
             mPreviewRequestBuilder.set(
                     CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
 
+//            computeZoomRegion(0);
+//            if( mScalarCropRegion != null ) {
+//                Rect current_rect = mPreviewRequestBuilder.get(CaptureRequest.SCALER_CROP_REGION);
+//                Timber.d("current_rect left: %d, current_rect top: %d, " +
+//                                "current_rect right: %d, current_rect bottom: %d",
+//                        current_rect.left, current_rect.top,
+//                        current_rect.right, current_rect.bottom);
+//                mPreviewRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, mScalarCropRegion);
+//            }
+
             // We disable customizing focus distance by user input because
             // it is less flexible than tap to focus.
 //            boolean manualControl = mSharedPreferences.getBoolean("switchManualControl", false);
@@ -397,21 +491,43 @@ public class Camera2Proxy {
             surfaces.add(mPreviewSurface);
             mPreviewRequestBuilder.addTarget(mPreviewSurface);
 
-            mCameraDevice.createCaptureSession(surfaces,
-                    new CameraCaptureSession.StateCallback() {
+            CameraCaptureSession.StateCallback captureStateCallback = new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(@NonNull CameraCaptureSession session) {
+                    mCaptureSession = session;
+                    mPreviewRequest = mPreviewRequestBuilder.build();
+                    startPreview();
+                }
 
-                        @Override
-                        public void onConfigured(@NonNull CameraCaptureSession session) {
-                            mCaptureSession = session;
-                            mPreviewRequest = mPreviewRequestBuilder.build();
-                            startPreview();
-                        }
+                @Override
+                public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                    Timber.w("ConfigureFailed. session: mCaptureSession");
+                }
+            };
 
-                        @Override
-                        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-                            Timber.w("ConfigureFailed. session: mCaptureSession");
-                        }
-                    }, mBackgroundHandler);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                List<OutputConfiguration> outputConfigs = new ArrayList<>();
+                for (Surface surface : surfaces) {
+                    OutputConfiguration config = new OutputConfiguration(surface);
+                    if (!mPhysicalCameraIds.isEmpty()) {
+                        // As a rule of thumb, we assume that normal camera at index 0, wide angle lens at index 1.
+                        // TODO(jhuai): choose wide angles lens by checking the camera characteristics as in Basicbokeh.
+                        String physicalCameraId = (String) mPhysicalCameraIds.toArray()[1];
+                        config.setPhysicalCameraId(physicalCameraId);
+                    }
+                    outputConfigs.add(config);
+                }
+                ExecutorService executor = Executors.newCachedThreadPool();
+                SessionConfiguration sessionConfig = new SessionConfiguration(
+                        SessionConfiguration.SESSION_REGULAR,
+                        outputConfigs,
+                        executor,
+                        captureStateCallback);
+                mCameraDevice.createCaptureSession(sessionConfig);
+            } else {
+                mCameraDevice.createCaptureSession(surfaces,
+                        captureStateCallback, mBackgroundHandler);
+            }
         } catch (CameraAccessException e) {
             Timber.e(e);
         }
