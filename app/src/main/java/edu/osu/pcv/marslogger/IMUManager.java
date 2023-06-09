@@ -30,7 +30,7 @@ public class IMUManager implements SensorEventListener {
     private int mSensorRate = SensorManager.SENSOR_DELAY_FASTEST;
 
     public static String ImuHeader = "Timestamp[nanosec],gx[rad/s],gy[rad/s],gz[rad/s]," +
-            "ax[m/s^2],ay[m/s^2],az[m/s^2],Unix time[nanosec]\n";
+            "ax[m/s^2],ay[m/s^2],az[m/s^2],mx[uT],my[uT],mz[uT],Unix time[nanosec]\n";
 
     private class SensorPacket {
         long timestamp; // nanoseconds
@@ -60,6 +60,7 @@ public class IMUManager implements SensorEventListener {
     private SensorManager mSensorManager;
     private Sensor mAccel;
     private Sensor mGyro;
+    private Sensor mMag;
     private static SharedPreferences mSharedPreferences;
     private int linear_acc; // accuracy
     private int angular_acc;
@@ -70,11 +71,13 @@ public class IMUManager implements SensorEventListener {
 
     private Deque<SensorPacket> mGyroData = new ArrayDeque<>();
     private Deque<SensorPacket> mAccelData = new ArrayDeque<>();
+    private Deque<SensorPacket> mMagData = new ArrayDeque<>();
 
     public IMUManager(Activity activity) {
         mSensorManager = (SensorManager) activity.getSystemService(Context.SENSOR_SERVICE);
         mAccel = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        mMag = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity);
     }
 
@@ -82,11 +85,12 @@ public class IMUManager implements SensorEventListener {
         try {
             mDataWriter = new BufferedWriter(
                     new FileWriter(captureResultFile, false));
-            if (mGyro == null || mAccel == null) {
+            if (mGyro == null || mAccel == null || mMag == null) {
                 String warning = "The device may not have a gyroscope or an accelerometer!\n" +
                         "No IMU data will be logged.\n" +
                         "Has Gyroscope? " + (mGyro == null ? "No":"Yes") + "\n"
-                        + "Has Accelerometer? " + (mAccel == null ? "No":"Yes") + "\n";
+                        + "Has Accelerometer? " + (mAccel == null ? "No":"Yes") + "\n"
+                        + "Has Magnetometer? " + (mMag == null ? "No":"Yes") + "\n";
                 mDataWriter.write(warning);
             } else {
                 mDataWriter.write(ImuHeader);
@@ -136,7 +140,7 @@ public class IMUManager implements SensorEventListener {
                 mAccelData.clear();
                 mAccelData.add(latestAccel);
             } else { // linearly interpolate the accel data at the gyro timestamp
-                float[] gyro_accel = new float[6];
+                float[] gyro_accel = new float[9];
                 SensorPacket sp = new SensorPacket(oldestGyro.timestamp, oldestGyro.unixTime, gyro_accel);
                 gyro_accel[0] = oldestGyro.values[0];
                 gyro_accel[1] = oldestGyro.values[1];
@@ -177,6 +181,41 @@ public class IMUManager implements SensorEventListener {
                             (rightAccel.values[2] - leftAccel.values[2]) * ratio;
                 }
 
+                // fill mag data to synced data.
+                if (mMagData.size() > 0) {
+                    SensorPacket latestMag = mMagData.peekLast();
+                    gyro_accel[6] = latestMag.values[0];
+                    gyro_accel[7] = latestMag.values[1];
+                    gyro_accel[8] = latestMag.values[2];
+                    if (mMagData.size() > 1) { // Extrapolation is allowed.
+                        Iterator<SensorPacket> mitr = mMagData.descendingIterator();
+                        SensorPacket rightMag = mitr.next();
+                        SensorPacket leftMag = mitr.next();
+                        float tmp1 = oldestGyro.timestamp - leftMag.timestamp;
+                        float tmp2 = rightMag.timestamp - leftMag.timestamp;
+                        if (tmp2 > 0.000001) {
+                            float ratio = tmp1 / tmp2;
+                            for (int i = 0; i < 3; i++)
+                                gyro_accel[6 + i] = leftMag.values[i] +
+                                        (rightMag.values[i] - leftMag.values[i]) * ratio;
+                        }
+                        // manage the mag buffer.
+                        if (mMagData.size() > 2) {
+                            mitr = mMagData.descendingIterator();
+                            boolean found_lower_bound = false;
+                            while (mitr.hasNext()) {
+                                SensorPacket packet = mitr.next();
+                                if (found_lower_bound) {
+                                    mitr.remove();
+                                } else if (packet.timestamp <= oldestGyro.timestamp) {
+                                    found_lower_bound = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // manage the gyro and accel buffers.
                 mGyroData.removeFirst();
                 for (Iterator<SensorPacket> iterator = mAccelData.iterator();
                      iterator.hasNext(); ) {
@@ -212,6 +251,9 @@ public class IMUManager implements SensorEventListener {
                     Timber.e(ioe);
                 }
             }
+        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+            SensorPacket sp = new SensorPacket(event.timestamp, unixTime, event.values);
+            mMagData.add(sp);
         }
     }
 
@@ -231,6 +273,8 @@ public class IMUManager implements SensorEventListener {
                 this, mAccel, mSensorRate, sensorHandler);
         mSensorManager.registerListener(
                 this, mGyro, mSensorRate, sensorHandler);
+        mSensorManager.registerListener(
+                this, mMag, mSensorRate, sensorHandler);
     }
 
     /**
@@ -239,6 +283,7 @@ public class IMUManager implements SensorEventListener {
     public void unregister() {
         mSensorManager.unregisterListener(this, mAccel);
         mSensorManager.unregisterListener(this, mGyro);
+        mSensorManager.unregisterListener(this, mMag);
         mSensorManager.unregisterListener(this);
         mSensorThread.quitSafely();
         stopRecording();
