@@ -11,18 +11,14 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
 
-import androidx.core.util.Consumer;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-
-import com.marslogger.locationprovider.LocationProvider;
 
 import edu.osu.pcv.marslogger.ImuViewContent.SingleAxis;
 

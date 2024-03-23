@@ -3,8 +3,6 @@ package edu.osu.pcv.marslogger;
 import android.app.Activity;
 import android.location.Location;
 
-import com.marslogger.locationprovider.LocationProvider;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;

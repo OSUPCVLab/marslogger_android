@@ -1,4 +1,4 @@
-package com.marslogger.locationprovider;
+package edu.osu.pcv.marslogger;
 
 import android.Manifest;
 import android.content.Context;
