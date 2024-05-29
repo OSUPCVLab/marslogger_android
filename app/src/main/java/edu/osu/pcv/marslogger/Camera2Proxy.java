@@ -28,9 +28,11 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.preference.PreferenceManager;
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 
 import android.util.Log;
 
+import android.util.Range;
 import android.util.Size;
 import android.util.SizeF;
 import android.view.OrientationEventListener;
@@ -257,9 +259,27 @@ public class Camera2Proxy {
      * @param value
      */
     private void computeZoomRatios() {
-        float max_zoom = mCameraCharacteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
-        boolean is_zoom_supported = max_zoom > 0.0f;
-        Timber.d("max_zoom: " + max_zoom);
+        float min_zoom = 0.0f;
+        float max_zoom = 0.0f;
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ) {
+            // use CONTROL_ZOOM_RATIO_RANGE on Android 11+, to support multiple cameras with zoom ratios
+            // less than 1
+            Range<Float> zoom_ratio_range = mCameraCharacteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE);
+            if( zoom_ratio_range != null ) {
+                min_zoom = zoom_ratio_range.getLower();
+                max_zoom = zoom_ratio_range.getUpper();
+            }
+            else {
+                Timber.d("zoom_ratio_range not supported");
+            }
+        }
+        else {
+            min_zoom = 1.0f;
+            max_zoom = mCameraCharacteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+        }
+        boolean is_zoom_supported = max_zoom > 0.0f && min_zoom > 0.0f;
+        Timber.d("min zoom: " + min_zoom);
+        Timber.d("max zoom: " + max_zoom);
         if( is_zoom_supported ) {
             // set 20 steps per 2x factor
             final int steps_per_2x_factor = 20;
@@ -443,6 +463,14 @@ public class Camera2Proxy {
         Timber.d("ISO set to %d", desiredIso);
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    private void setZoomRatio(CaptureRequest.Builder builder, float control_zoom_ratio) {
+        if( control_zoom_ratio > 0 ) {
+            builder.set(CaptureRequest.CONTROL_ZOOM_RATIO, control_zoom_ratio );
+            Timber.d("Setting zoom ratio to " + control_zoom_ratio);
+        }
+    }
+
     private void initPreviewRequest(boolean previewForSnapshot) {
         try {
             mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
@@ -452,6 +480,10 @@ public class Camera2Proxy {
                     CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
             mPreviewRequestBuilder.set(
                     CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
+
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+//                setZoomRatio(mPreviewRequestBuilder, 1.0f);
+//            }
 
 //            computeZoomRegion(0);
 //            if( mScalarCropRegion != null ) {
@@ -505,7 +537,7 @@ public class Camera2Proxy {
                 }
             };
 
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 List<OutputConfiguration> outputConfigs = new ArrayList<>();
                 for (Surface surface : surfaces) {
                     OutputConfiguration config = new OutputConfiguration(surface);
