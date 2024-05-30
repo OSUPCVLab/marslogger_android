@@ -56,6 +56,9 @@ import edu.osu.pcv.marslogger.gles.FullFrameRect;
 import edu.osu.pcv.marslogger.gles.Texture2dProgram;
 import timber.log.Timber;
 
+import org.ros.android.RosActivity;
+import org.ros.node.NodeMainExecutor;
+
 /**
  * Shows the camera preview on screen while simultaneously recording it to a .mp4 file.
  * <p>
@@ -140,7 +143,7 @@ class DesiredCameraSetting {
 }
 
 
-class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFrameAvailableListener {
+class CameraCaptureActivityBase extends RosActivity implements SurfaceTexture.OnFrameAvailableListener {
     public static final String TAG = "MarsLogger";
     protected static final boolean VERBOSE = false;
 
@@ -162,6 +165,10 @@ class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFra
 
     protected SampleGLView mGLView;
     protected TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
+
+    public CameraCaptureActivityBase() {
+        super("RosAndroidExample", "RosAndroidExample");
+    }
 
     /**
      * Connects the SurfaceTexture to the Camera preview output, and starts the preview.
@@ -264,6 +271,16 @@ class CameraCaptureActivityBase extends Activity implements SurfaceTexture.OnFra
         String previewFacts = mCameraPreviewWidth + "x" + mCameraPreviewHeight + "@" + sfps;
 
         mKeyCameraParamsText.setText(previewFacts);
+    }
+
+    @Override
+    public void onPointerCaptureChanged(boolean hasCapture) {
+        super.onPointerCaptureChanged(hasCapture);
+    }
+
+    @Override
+    protected void init(NodeMainExecutor nodeMainExecutor) {
+
     }
 }
 

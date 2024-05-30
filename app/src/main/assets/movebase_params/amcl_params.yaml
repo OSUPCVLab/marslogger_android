@@ -1,0 +1,46 @@
+# initial_pose_a: Initial pose angle in radians. initial pose is map_frame_T_base_frame.
+# If the map is created by cartographer, its initial world frame is often aligned to the laser frame.
+# Then, map_T_base will be close to laser_T_base. The yaw angle can be quickly checked at
+# https://www.andre-gaschler.com/rotationconverter/
+
+initial_pose_x: 0.0
+initial_pose_y: 0.0
+initial_pose_a: 3.14159
+initial_cov_xx: 2.25
+initial_cov_yy: 2.25
+initial_cov_aa: 2.5
+min_particles: 300
+max_particles: 800
+kld_err: 0.01
+update_min_d: 0.05
+update_min_a: 0.05
+update_min_t: 1.0
+
+resample_interval: 1
+transform_tolerance: 0.15
+recovery_alpha_slow: 0.00
+recovery_alpha_fast: 0.00
+
+gui_publish_rate: 20.0
+save_pose_rate: -1
+
+laser_max_range: 10.5
+laser_min_range: 0.3
+laser_max_beams: 200
+laser_z_hit: 0.95
+laser_z_short: 0.05
+laser_z_max: 0.05
+laser_z_rand: 0.05 # for likelihood_field model, z_rand + z_hit = 1.0. For dynamic/large scenes, z_rand should be larger.
+laser_sigma_hit: 0.05
+laser_lambda_short: 0.1
+laser_likelihood_max_dist: 2.0 # enlarge this param in large scenes, roughly means, the average distance to the nearest occupied cell.
+laser_model_type: likelihood_field
+
+odom_model_type: diff
+odom_alpha1: 0.1
+odom_alpha2: 0.1
+odom_alpha3: 0.1
+odom_alpha4: 0.1
+odom_frame_id: odom
+base_frame_id: base_footprint
+scan_topic: scan

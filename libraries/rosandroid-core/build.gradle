@@ -1,0 +1,58 @@
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 31
+
+    defaultConfig {
+        minSdkVersion 23
+    }
+}
+
+configurations {
+    // the meaning of all*.: https://stackoverflow.com/questions/55441430/what-does-this-all-exclude-means-in-gradle-transitive-dependency
+    all*.exclude group: 'org.ros.rosjava_bootstrap', module: 'gradle_plugins'
+    all {
+        exclude module: 'com.springsource.org.apache.commons.logging'
+        exclude module: 'httpclient'
+        all*.exclude module: 'appcompat-v7'
+        all*.exclude module: 'support-v4'
+    }
+}
+
+dependencies {
+    // check availability at https://github.com/rosjava/rosjava_mvn_repo/tree/master/org/ros/rosjava_core/rosjava
+    api ('org.ros.rosjava_core:rosjava:0.3.6') {
+        exclude group: 'xml-apis'
+        exclude group: 'junit'
+    }
+    implementation ('org.ros.rosjava_core:rosjava:0.3.6') {
+        exclude group: 'xml-apis'
+        exclude group: 'junit'
+    }
+
+    api 'org.ros.rosjava_messages:std_msgs:0.5.11'
+    api 'org.ros.rosjava_messages:rosgraph_msgs:1.11.2'
+    api 'org.ros.rosjava_messages:sensor_msgs:1.12.5'
+    api 'org.ros.rosjava_messages:nav_msgs:1.12.7'
+    api 'org.ros.rosjava_messages:diagnostic_msgs:1.12.5'
+    api "org.ros.rosjava_messages:geometry_msgs:1.12.7"
+
+    implementation "org.ros.rosjava_messages:geometry_msgs:1.12.7"
+    implementation 'org.ros.rosjava_messages:std_msgs:0.5.11'
+    implementation 'org.ros.rosjava_messages:rosgraph_msgs:1.11.2'
+    implementation 'org.ros.rosjava_messages:sensor_msgs:1.12.5'
+    implementation 'org.ros.rosjava_messages:diagnostic_msgs:1.12.5'
+    api "org.ros.rosjava_bootstrap:message_generation:0.3.3"
+    implementation "org.ros.rosjava_bootstrap:message_generation:0.3.3"
+
+    api 'androidx.appcompat:appcompat:1.4.1'
+    implementation 'androidx.appcompat:appcompat:1.4.1'
+
+//    api "org.jboss.netty:netty:3.2.10.Final"
+//    implementation "org.jboss.netty:netty:3.2.10.Final"
+
+    // implementation for apache commons logging
+    api 'commons-logging:commons-logging:1.2'
+    implementation 'commons-logging:commons-logging:1.2'
+    implementation 'com.google.guava:guava:27.0.1-android'
+}

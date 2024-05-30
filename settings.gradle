@@ -1,2 +1,3 @@
 include ':app'
-include ':LocationProvider'
+// here we include the core of ros-android and rosjava
+include ':libraries:rosandroid-core'

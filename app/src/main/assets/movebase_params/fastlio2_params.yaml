@@ -1,0 +1,59 @@
+# adapted from catkin_ws/src/FAST_LIO/launch/loc_mid360.launch
+
+# pcdmap will be passed via function call
+locmode: true
+showmap: false
+feature_extract_enable: false
+point_filter_num: 4
+max_iteration: 4
+filter_size_surf: 0.5
+filter_size_map: 0.3 # enlarge this value for better efficiency, reduce this value for better accuracy
+cube_side_length: 600
+runtime_pos_log_enable: false  # enable to check the timings.
+
+# The below are copied from mid360.yaml of fastlio2.
+common:
+  lid_topic:  "/livox/lidar"
+  imu_topic:  "/livox/imu"
+  time_sync_en: false         # ONLY turn on when external time synchronization is really not possible
+  time_offset_lidar_to_imu: 0.0 # Time offset between lidar and IMU calibrated by other algorithms, e.g. LI-Init (can be found in README).
+  # This param will take effect no matter what time_sync_en is. So if the time offset is not known exactly, please set as 0.0
+
+preprocess:
+  lidar_type: 4                # 1 for Livox serials LiDAR, 2 for Velodyne LiDAR, 3 for ouster LiDAR,
+  scan_line: 4
+  blind: 1.2
+
+mapping:
+  acc_cov: 0.1
+  gyr_cov: 0.1
+  b_acc_cov: 0.0001
+  b_gyr_cov: 0.0001
+  fov_degree:    360
+  det_range:     40.0
+  extrinsic_est_en:  false      # true: enable the online estimation of IMU-LiDAR extrinsic
+  extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
+  extrinsic_R: [ 1, 0, 0,
+                 0, 1, 0,
+                 0, 0, 1]
+  init_world_t_lidar: [0.0, 0.0, 0.0]
+  init_world_qxyzw_lidar: [0.0, 0.0, 0.0, 1.0]
+
+queue_size:
+  lidar: 1
+  imu: 200
+  pub_cloud: 1
+  pub_path: 1
+
+publish:
+  path_en:  false
+  scan_publish_en:  true       # false: close all the point cloud output
+  dense_publish_en: false       # false: low down the points number in a global-frame point clouds scan.
+  scan_bodyframe_pub_en: false  # true: output the point cloud scans in IMU-body-frame
+  scan_lidar_pub_en: true       # true: output the point cloud scans in LiDAR-frame.
+  # To completely disable local collision avoidance, scan_lidar_pub_en can be set to false.
+
+pcd_save:
+  pcd_save_en: false
+  interval: -1                 # how many LiDAR frames saved in each pcd file;
+  # -1 : all frames will be saved in ONE pcd file, may lead to memory crash when having too much frames.

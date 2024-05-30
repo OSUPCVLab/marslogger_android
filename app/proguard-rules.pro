@@ -1,21 +1,34 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# By default, the flags in this file are appended to flags specified
+# in /Users/o-to-the-l/Files/android-sdk-macosx/tools/proguard/proguard-android.txt
+# You can edit the include path and order by changing the proguardFiles
+# directive in build.gradle.
 #
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Add any project specific keep options here:
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# obfuscation will break reflection and
+# make these rules much more complex
+-dontobfuscate
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# keep all ros classes with names
+-keep class org.ros.** { *; }
+-keepnames class org.ros.** { *; }
+-dontwarn org.ros.**
+
+# keep ros messages (not part of the org.ros namespace)
+-keep class rosgraph_msgs.** { *; }
+-keep class sensor_msgs.** { *; }
+-keep class std_msgs.** { *; }
+-keep class tf2_msgs.** { *; }
+
+-dontwarn org.apache.**
+-dontwarn org.jboss.netty.**
+-dontwarn com.google.common.**
+-dontwarn org.xbill.**
+
+# https://stackoverflow.com/a/50088271/3167294
+-keepattributes *Annotation*
+-keep @**annotation** class * {*;}

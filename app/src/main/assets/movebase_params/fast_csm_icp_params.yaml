@@ -1,0 +1,7 @@
+
+angular_search_range: 3.14159
+angular_step_size: 0.03491 # 0.0174533 # M_PI / 180
+max_depth: 3
+lidar_topic: /livox/lidar
+desired_grid_resolution: 0.2 # -1 to compute automatically
+consistency_check: false

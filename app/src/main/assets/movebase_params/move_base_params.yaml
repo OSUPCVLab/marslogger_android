@@ -1,0 +1,20 @@
+shutdown_costmaps: false
+controller_frequency: 10.0
+# The recovery behavior will be called either planner patience or max_planning_retries is exceeded.
+planner_patience: 5.0
+max_planning_retries: -1  # -1 means infinite retries
+controller_patience: 15.0
+conservative_reset_dist: 3.0
+planner_frequency: 5.0
+oscillation_timeout: 0.0  # is reset due to oscillation needed? 
+# Since we rarely see error message "Robot is oscillating.", so I assume oscillation recovery is extraneous.
+oscillation_distance: 0.2
+
+recovery_behavior_enabled: true
+clearing_rotation_allowed: false  # we do not ask the cane operator to rotate in clearing the costmap.
+# Instead, we directly reset the costmap when stuck.
+recovery_behaviors:
+  - {name: aggressive_reset, type: clear_costmap_recovery/ClearCostmapRecovery}
+
+aggressive_reset:
+  reset_distance: 10.0    # remove all voxels from the costmap.

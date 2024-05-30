@@ -1,4 +1,11 @@
 apply plugin: 'com.android.application'
+
+configurations {
+    all {
+        exclude module: 'com.springsource.org.apache.commons.logging'
+    }
+}
+
 // Display Xlint warnings. More info is at
 // https://stackoverflow.com/questions/27274526/how-to-add-java-compiler-options-when-compiling-with-android-gradle-plugin/27274527
 gradle.projectsEvaluated {
@@ -27,12 +34,12 @@ android {
         minSdkVersion 23
         targetSdkVersion 31
         versionCode 2
-        versionName "2.0"
+        versionName "2.1"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
 //            signingConfig signingConfigs.release
         }
@@ -41,10 +48,21 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    packagingOptions {
+        /* https://github.com/rosjava/android_core/issues/194 */
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE.txt'
+    }
+    sourceSets.main {
+        jniLibs.srcDir 'src/main/libs'
+        jni.srcDirs = [];
+    }
+    
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
 
     flavorDimensions("freedom")
     productFlavors {
@@ -60,6 +78,13 @@ android {
 }
 
 dependencies {
+    api project(':libraries:rosandroid-core')
+    implementation project(':libraries:rosandroid-core')
+
+    implementation 'org.ros.rosjava_core:rosjava_helpers:[0.3, 0.4)'
+    // External libraries
+    implementation 'com.hoho.android:usb-serial-for-android:[0.2, 0.3)'
+    // Android libraries
     implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation 'com.jakewharton.timber:timber:4.7.1'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
@@ -76,4 +101,15 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+}
+
+tasks.withType(JavaCompile) {
+    compileTask -> compileTask.dependsOn ndkBuild
+}
+
+task ndkBuild(type: Exec) {
+    Properties properties = new Properties()
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+    def ndkbuild = properties.getProperty('ndk.dir', null) + "/ndk-build"
+    commandLine ndkbuild, '-C', file('src/main/jni').absolutePath
 }

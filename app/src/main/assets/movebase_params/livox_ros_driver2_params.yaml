@@ -1,0 +1,16 @@
+# adapted from catkin_ws/src/livox_ros_driver2/launch_ROS1/rviz_MID360.launch
+
+xfer_format: 0  # 0 for PointCloud2, 1 for Livox custom message
+multi_topic: 0
+data_src: 0
+publish_freq: 10.0
+output_data_type: 0
+rviz_enable: false
+rosbag_enable: false
+output_bag: livox_test.bag
+cmdline_str: 100000000000000
+frame_id: livox_frame
+enable_lidar_bag: true
+enable_imu_bag: true
+cmdline_file_path: livox_test.lvx
+# user_config_path: # This will be passed through function call

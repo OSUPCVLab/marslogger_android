@@ -39,3 +39,5 @@ output.json
 #NDK
 obj/
 .externalNativeBuild
+
+app/src/main/libs/arm64-v8a/

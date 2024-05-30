@@ -3,11 +3,12 @@
 buildscript {
     
     repositories {
+	jcenter()
         google()
-        mavenCentral()
+        // mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.6.4'
+        classpath 'com.android.tools.build:gradle:7.4.2'
         
 
         // NOTE: Do not place your application dependencies here; they belong
@@ -17,8 +18,17 @@ buildscript {
 
 allprojects {
     repositories {
+	jcenter()
         google()
-        mavenCentral()
+        // mavenCentral()
+        maven {
+            name "rosjava-github"
+            url "https://github.com/rosjava/rosjava_mvn_repo/raw/master"
+        }
+        maven {
+            name "apache-commons-logging"
+            url "https://mvnrepository.com/artifact/commons-logging/commons-logging"
+        }
     }
 }
 
