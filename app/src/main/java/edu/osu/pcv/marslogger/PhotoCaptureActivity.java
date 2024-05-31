@@ -223,8 +223,7 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
                     mSnapshotOutputDir + File.separator + "movie_metadata.csv");
             mSnap = true;
         }
-        TextView numSnapshotView = (TextView) findViewById(R.id.numSnapshot_text);
-        numSnapshotView.setText(String.valueOf(mSnapNumber + 1));
+        Timber.d("Number of snapshots: %d", mSnapNumber + 1);
     }
 
 }

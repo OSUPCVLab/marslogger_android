@@ -36,7 +36,7 @@ public class ImuPublisherNode extends AbstractNodeMain {
     private OnFrameIdChangeListener imuFrameIdChangeListener;
 
     public ImuPublisherNode() {
-        this.topic_name = "imu_data";
+        this.topic_name = "phone_imu";
         isAccelerometerMessagePending = false;
         isGyroscopeMessagePending = false;
         isOrientationMessagePending = false;

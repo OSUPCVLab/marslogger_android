@@ -16,10 +16,18 @@
 
 package edu.osu.pcv.marslogger;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 
+import android.hardware.Sensor;
+import android.hardware.SensorManager;
+import android.location.Criteria;
+import android.location.LocationManager;
 import android.opengl.EGL14;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
@@ -30,6 +38,11 @@ import android.os.Handler;
 import android.os.Message;
 
 import androidx.annotation.RequiresApi;
+
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.Log;
+import android.util.Pair;
 import android.util.Size;
 import android.view.Display;
 import android.view.Surface;
@@ -38,16 +51,23 @@ import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
+import java.net.URI;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -56,8 +76,27 @@ import edu.osu.pcv.marslogger.gles.FullFrameRect;
 import edu.osu.pcv.marslogger.gles.Texture2dProgram;
 import timber.log.Timber;
 
+import org.ollide.rosandroid.FileManager;
+import org.ollide.rosandroid.ImuPublisherNode;
+import org.ollide.rosandroid.LocationPublisherNode;
+import org.ollide.rosandroid.ModuleStatusIndicator;
+import org.ollide.rosandroid.NewsUpdateListener;
+import org.ollide.rosandroid.OnFrameIdChangeListener;
+import org.ollide.rosandroid.PathListenerNode;
+import org.ros.address.InetAddressFactory;
+import org.ros.android.IPTool;
 import org.ros.android.RosActivity;
+import org.ros.helpers.ParameterLoaderNode;
+import org.ros.node.ConnectedNode;
+import org.ros.node.DefaultNodeListener;
+import org.ros.node.Node;
+import org.ros.node.NodeConfiguration;
 import org.ros.node.NodeMainExecutor;
+import org.ros.node.NodeListener;
+
+import org.ros.rosjava_tutorial_native_node.FastLioNativeNode;
+import org.ros.rosjava_tutorial_native_node.LivoxRosDriver2NativeNode;
+import org.ros.rosjava_tutorial_native_node.LaserLoggerNativeNode;
 
 /**
  * Shows the camera preview on screen while simultaneously recording it to a .mp4 file.
@@ -308,6 +347,41 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private GPSManager mGpsManager;
     private TimeBaseManager mTimeBaseManager;
 
+    ///@{ // ros stuff
+    static {
+        System.loadLibrary("laser_logger_jni");
+        System.loadLibrary("fastlio_jni");
+        System.loadLibrary("livox_ros_driver2_jni");
+    }
+
+    private static ArrayList<Pair<String, String>> mResourcesToLoad = new ArrayList<Pair<String, String>>() {{
+        add(new Pair<String, String>("movebase_params/fastlio2_params.yaml", "/"));
+        // We use the global namespace for fastlio2.
+        add(new Pair<String, String>("movebase_params/livox_ros_driver2_params.yaml", "/"));
+        // We use the global namespace for livox ros driver2.
+        add(new Pair<String, String>("movebase_params/fast_csm_icp_params.yaml", "/"));
+        // We use the global namespace for fast csm icp.
+    }};
+
+    private ArrayList<ParameterLoaderNode.Resource> mOpenedResources = new ArrayList<>();
+    private NodeMainExecutor nodeMainExecutor = null;
+    private URI masterUri;
+    private String hostName;
+
+    private FastLioNativeNode fastlioNativeNode;
+    private LivoxRosDriver2NativeNode livoxNativeNode;
+
+    private LaserLoggerNativeNode laserLoggerNativeNode;
+    private PathListenerNode pathListenerNode;
+    private ParameterLoaderNode mParameterLoaderNode;
+    private int lidarId = 0;
+
+    private TextView masterUriTextView;
+    private TextView msgCountTextView;
+    private TextView positionTextView;
+    private TextView lidarIdTextView;
+    ///@} // end of ros stuff
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -323,6 +397,32 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         // Apply the adapter to the spinner.
         spinner.setAdapter(adapter);
         spinner.setOnItemSelectedListener(this);
+
+        ///@{ // ros stuff
+        masterUriTextView = findViewById(R.id.masterUriText);
+        msgCountTextView = findViewById(R.id.numLidarMsgText);
+        positionTextView = findViewById(R.id.currentPositionText);
+        lidarIdTextView = findViewById(R.id.lidarIdText);
+
+        String extdir = getExternalFilesDir(
+                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
+        File configFile = new File(extdir, "MID360_config.json");
+        String prevLidarId = IPTool.getPreviousLidarId(configFile);
+        if (prevLidarId.length() > 0)
+            lidarId = Integer.parseInt(prevLidarId);
+        lidarIdTextView.setText(String.valueOf(lidarId));
+
+        // Load raw resources
+        for (Pair<String, String> ip : mResourcesToLoad) {
+            InputStream assetInStream=null;
+            try { // https://stackoverflow.com/questions/1933015/opening-a-file-from-assets-folder-in-android
+                assetInStream=getAssets().open(ip.first);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            mOpenedResources.add(new ParameterLoaderNode.Resource(assetInStream, ip.second));
+        }
+        ///@} // end of ros stuff
     }
 
     @Override
@@ -425,6 +525,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     protected void onDestroy() {
         Timber.d("onDestroy");
         super.onDestroy();
+        nodeMainExecutor.shutdown();
         mCameraHandler.invalidateHandler();     // paranoia
     }
 
@@ -469,11 +570,15 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mImuManager.startRecording(inertialFile);
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
+            startFastLio();
+            startPathListener();
+            startLaserLogging();
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
             mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();
+            stopLaserLogging();
         }
         mGLView.queueEvent(new Runnable() {
             @Override
@@ -495,6 +600,279 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         toggleRelease.setText(id);
     }
 
+    ///@{ // ros stuff
+    @Override
+    protected void init(NodeMainExecutor nodeMainExecutor) {
+        // Store a reference to the NodeMainExecutor and unblock any processes that were waiting
+        // for this to start ROS Nodes
+        this.nodeMainExecutor = nodeMainExecutor;
+        masterUri = getMasterUri();
+        hostName = getRosHostname();
+
+        configureParameterServer();
+
+        LocationPublisherNode locationPublisherNode = new LocationPublisherNode();
+        ImuPublisherNode imuPublisherNode = new ImuPublisherNode();
+
+        Criteria criteria = new Criteria();
+        criteria.setAccuracy(Criteria.ACCURACY_FINE);
+        criteria.setPowerRequirement(Criteria.POWER_LOW);
+        criteria.setAltitudeRequired(false);
+        criteria.setBearingRequired(false);
+        criteria.setSpeedRequired(false);
+        criteria.setCostAllowed(true);
+        final String provider = LocationManager.GPS_PROVIDER;
+        String svcName = Context.LOCATION_SERVICE;
+        final LocationManager locationManager = (LocationManager) getSystemService(svcName);
+        final int t = 500;
+        final float distance = 0.1f;
+
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    boolean permissionFineLocation = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                    boolean permissionCoarseLocation = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                    Log.d(TAG, "PERMISSION 1: " + String.valueOf(permissionFineLocation));
+                    Log.d(TAG, "PERMISSION 2: " + String.valueOf(permissionCoarseLocation));
+                    if (permissionFineLocation && permissionCoarseLocation) {
+                        if (locationManager != null) {
+                            Log.d(TAG, "Requesting location");
+                            locationManager.requestLocationUpdates(provider, t, distance,
+                                    locationPublisherNode.getLocationListener());
+                        }
+                    } else {
+                        // Request permissions
+                        requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, PackageManager.GET_PERMISSIONS);
+                    }
+                } else {
+                    locationManager.requestLocationUpdates(provider, t, distance, locationPublisherNode.getLocationListener());
+                }
+                masterUriTextView.setText(masterUri.toString());
+            }
+        });
+
+        SensorManager sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        try {
+            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            sensorManager.registerListener(imuPublisherNode.getAccelerometerListener(), accelerometer, SensorManager.SENSOR_DELAY_GAME);
+        } catch (NullPointerException e) {
+            Log.e(TAG, e.toString());
+            return;
+        }
+
+        SensorManager sensorManager1 = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        try {
+            Sensor gyroscope = sensorManager1.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+            sensorManager1.registerListener(imuPublisherNode.getGyroscopeListener(), gyroscope, SensorManager.SENSOR_DELAY_GAME);
+        } catch (NullPointerException e) {
+            Log.e(TAG, e.toString());
+            return;
+        }
+
+        SensorManager sensorManager2 = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        try {
+            Sensor orientation = sensorManager2.getDefaultSensor(Sensor.TYPE_ORIENTATION);
+            sensorManager2.registerListener(imuPublisherNode.getOrientationListener(), orientation, SensorManager.SENSOR_DELAY_FASTEST);
+        } catch (NullPointerException e) {
+            Log.e(TAG, e.toString());
+            return;
+        }
+
+        // At this point, the user has already been prompted to either enter the URI
+        // of a master to use or to start a master locally.
+
+        // The user can easily use the selected ROS Hostname in the master chooser
+        // activity.
+
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(InetAddressFactory.newNonLoopback().getHostAddress());
+        nodeConfiguration.setMasterUri(getMasterUri());
+
+        nodeMainExecutor.execute(locationPublisherNode, nodeConfiguration);
+        nodeMainExecutor.execute(imuPublisherNode, nodeConfiguration);
+
+        SharedPreferences sp = getSharedPreferences("SharedPreferences", MODE_PRIVATE);
+        SharedPreferences.Editor spe = sp.edit();
+        if (lidarId != 0) {
+            spe.putInt("LidarId", lidarId);
+        }
+        spe.apply();
+
+        startLivoxRosDriver2();
+    }
+
+    /**
+     * Helper method to block the calling thread until the latch is zeroed by some other task.
+     * @param latch Latch to wait for.
+     * @param latchName Name to be used in log messages for the given latch.
+     */
+    private void waitForLatchUnlock(CountDownLatch latch, String latchName) {
+        try {
+            Log.i(TAG, "Waiting for " + latchName + " latch release...");
+            latch.await();
+            Log.i(TAG,latchName + " latch released!");
+        } catch (InterruptedException ie) {
+            Log.w(TAG, "Warning: continuing before " + latchName + " latch was released");
+        }
+    }
+
+    /**
+     * Starts {@link ParameterLoaderNode} and waits for it to finish setting parameters.
+     */
+    private void configureParameterServer() {
+        CountDownLatch latch = new CountDownLatch(1);
+        startParameterLoaderNode(latch);
+        waitForLatchUnlock(latch, "parameter");
+    }
+
+    private void startParameterLoaderNode(final CountDownLatch latch) {
+        // Create node to load configuration to Parameter Server
+        Log.i(TAG, "Setting parameters in Parameter Server");
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(ParameterLoaderNode.NODE_NAME);
+        mParameterLoaderNode = new ParameterLoaderNode(mOpenedResources);
+        nodeMainExecutor.execute(mParameterLoaderNode, nodeConfiguration,
+                new ArrayList<NodeListener>() {{
+                    add(new DefaultNodeListener() {
+                        @Override
+                        public void onShutdown(Node node) {
+                            latch.countDown();
+                        }
+
+                        @Override
+                        public void onError(Node node, Throwable throwable) {
+                            Log.e(TAG, "Error loading parameters to ROS parameter server: " + throwable.getMessage(), throwable);
+                        }
+                    });
+                }});
+    }
+
+    private String checkPointCloudPcdMap() {
+        String extdir = getExternalFilesDir(
+                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
+        File mapFile = new File(extdir, "maps/map_0.1.pcd");
+        // we do not copy the pgm here because the pgm from the apk is corrupt and unable to be loaded by the map_server.
+        if (!mapFile.exists()) {
+            Log.e(TAG, "Error cannot find point cloud map: " + mapFile.getAbsolutePath() +
+                    "\n.Push them into the folder with adb push.");
+        }
+        return mapFile.getAbsolutePath();
+    }
+
+    private String checkOccupancyGridMap() {
+        // Create the sample map in the app data dir
+        String extdir = getExternalFilesDir(
+                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
+        File mapFile = new File(extdir, "maps/map.yaml");
+        // we do not copy the pgm here because the pgm from the apk is corrupt and unable to be loaded by the map_server.
+        // The pgm file should be put into the /sdcard/Android/data/org.ollide.rosandroid/files/data folder by adb push.
+        if (!mapFile.exists()) {
+            Log.e(TAG, "Error cannot find occupancy grid map: " + mapFile.getAbsolutePath() +
+                    "\n.Push them into the folder with adb push.");
+        }
+        return mapFile.getAbsolutePath();
+    }
+
+    private String createLidarUserConfig(String hostip, String lidarip) {
+        String extdir = getExternalFilesDir(
+                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
+        File configFile = new File(extdir, "MID360_config.json");
+        String config = LivoxRosDriver2NativeNode.createLidarConfig(hostip, lidarip);
+        FileManager.writeToFile(config, configFile);
+        return configFile.getAbsolutePath();
+    }
+
+    private String getUniqueBagPath() {
+        String extdir = getExternalFilesDir(
+                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath() + "/rosbags";
+        if (!new File(extdir).exists()) {
+            new File(extdir).mkdir();
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault());
+        String currentDateandTime = sdf.format(new Date());
+        return extdir + "/" + currentDateandTime + ".bag";
+    }
+
+    private void startFastLio() {
+        Log.i(TAG, "Starting native fastlio node wrapper...");
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(FastLioNativeNode.nodeName);
+        String pcdmappath = checkPointCloudPcdMap();
+        String[] extraArgs = new String[1];
+        extraArgs[0] = pcdmappath;
+        fastlioNativeNode = new FastLioNativeNode(extraArgs);
+        nodeMainExecutor.execute(fastlioNativeNode, nodeConfiguration);
+    }
+
+    private void startLivoxRosDriver2() {
+        Log.i(TAG, "Starting native livox ros driver2 node wrapper...");
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(LivoxRosDriver2NativeNode.nodeName);
+        // The IP address of eth0 of the android phone.
+        String hostip = IPTool.getHostEthernetIp();
+        // the subnet of the IP address of eth0 of the android phone + .1xx
+        // where xx are the last two digits of the mid360 serial number.
+
+        String lidarid = String.valueOf(lidarId);
+        String lidarip = IPTool.composeLidarIp(hostip, lidarid);
+        String userconfigpath = createLidarUserConfig(hostip, lidarip);
+        Log.i(TAG, "host ip:" + hostip + ", lidar ip:" + lidarip);
+        String[] extraArgs = new String[1];
+        extraArgs[0] = userconfigpath;
+        livoxNativeNode = new LivoxRosDriver2NativeNode(extraArgs);
+        nodeMainExecutor.execute(livoxNativeNode, nodeConfiguration);
+    }
+
+    private void startPathListener() {
+        Log.i(TAG, "Starting path listener node...");
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(PathListenerNode.nodeName);
+
+        pathListenerNode = new PathListenerNode();
+        pathListenerNode.setOnNewsUpdateListener(
+                new NewsUpdateListener() {
+                    @Override
+                    public void onNewsUpdate(double x, double y, double z) {
+                        runOnUiThread(
+                                new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        String s = "Odom: " + String.format("%.2f", x) + "," +
+                                                String.format("%.2f", y) + "," + String.format("%.2f", z);
+                                        positionTextView.setText(s);
+                                    }
+                                }
+                        );
+                    }
+                }
+        );
+        nodeMainExecutor.execute(pathListenerNode, nodeConfiguration);
+    }
+
+    private void startLaserLogging() {
+        Log.i(TAG, "Starting native laser logging node wrapper...");
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(LaserLoggerNativeNode.nodeName);
+        String rosbagPath = getUniqueBagPath();
+        String[] extraArgs = new String[1];
+        extraArgs[0] = rosbagPath;
+        laserLoggerNativeNode = new LaserLoggerNativeNode(extraArgs);
+        nodeMainExecutor.execute(laserLoggerNativeNode, nodeConfiguration);
+    }
+
+    private void stopLaserLogging() {
+        int pcmsgCount = laserLoggerNativeNode.shutdown();
+        msgCountTextView.setText(String.valueOf(pcmsgCount));
+    }
+    ///@} // end of ros stuff
 }
 
 

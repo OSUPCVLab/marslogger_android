@@ -18,12 +18,6 @@
         tools:layout="@layout/activity_camera_capture" />
 
     <activity
-        android:id="@+id/navigation_photo"
-        android:name="edu.osu.pcv.marslogger.PhotoCaptureActivity"
-        android:label="@string/title_photo"
-        tools:layout="@layout/activity_photo_capture" />
-
-    <activity
         android:id="@+id/navigation_about"
         android:name="edu.osu.pcv.marslogger.InfoActivity"
         android:label="@string/title_about"

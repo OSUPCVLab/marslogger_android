@@ -70,21 +70,74 @@
         android:text="@string/cameraOutputDir_text" />
 
     <TextView
-        android:id="@+id/numSnapshotLabel"
+        android:id="@+id/lidarIdLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignStart="@id/cameraParams_text"
         android:layout_below="@id/cameraOutputDirLabel"
-        android:text="@string/numSnapshotLabel" />
+        android:text="Mid360 Id: " />
 
     <TextView
-        android:id="@+id/numSnapshot_text"
+        android:id="@+id/lidarIdText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignBaseline="@id/numSnapshotLabel"
-        android:layout_alignBottom="@id/numSnapshotLabel"
-        android:layout_toEndOf="@id/numSnapshotLabel"
+        android:layout_alignBaseline="@id/lidarIdLabel"
+        android:layout_alignBottom="@id/lidarIdLabel"
+        android:layout_toEndOf="@id/lidarIdLabel"
         android:paddingStart="4dp"
-        android:text="@string/numSnapshotText" />
+        android:text="1xx" />
 
+    <TextView
+        android:id="@+id/masterUriLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@id/cameraParams_text"
+        android:layout_below="@id/lidarIdLabel"
+        android:text="Master URI: " />
+
+    <TextView
+        android:id="@+id/masterUriText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/masterUriLabel"
+        android:layout_alignBottom="@id/masterUriLabel"
+        android:layout_toEndOf="@id/masterUriLabel"
+        android:paddingStart="4dp"
+        android:text="http://10.135.11.x:11311/" />
+
+    <TextView
+        android:id="@+id/numLidarMsgLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@id/cameraParams_text"
+        android:layout_below="@id/masterUriLabel"
+        android:text="#Lidar Msg: " />
+
+    <TextView
+        android:id="@+id/numLidarMsgText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/numLidarMsgLabel"
+        android:layout_alignBottom="@id/numLidarMsgLabel"
+        android:layout_toEndOf="@id/numLidarMsgLabel"
+        android:paddingStart="4dp"
+        android:text="0" />
+
+    <TextView
+        android:id="@+id/currentPositionLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@id/cameraParams_text"
+        android:layout_below="@id/numLidarMsgLabel"
+        android:text="Position: " />
+
+    <TextView
+        android:id="@+id/currentPositionText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/currentPositionLabel"
+        android:layout_alignBottom="@id/currentPositionLabel"
+        android:layout_toEndOf="@id/currentPositionLabel"
+        android:paddingStart="4dp"
+        android:text="0.0, 0.0" />
 </merge>

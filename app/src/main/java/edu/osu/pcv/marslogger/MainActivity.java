@@ -9,6 +9,8 @@ import androidx.annotation.NonNull;
 import android.os.Bundle;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import android.util.Log;
 import android.widget.Toast;
 
 import java.util.ArrayList;
