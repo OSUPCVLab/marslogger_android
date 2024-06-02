@@ -163,8 +163,8 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
     @Override
     protected void onDestroy() {
         Timber.d("onDestroy");
-        super.onDestroy();
         mCameraHandler.invalidateHandler();     // paranoia
+        super.onDestroy();
     }
 
     // spinner selected

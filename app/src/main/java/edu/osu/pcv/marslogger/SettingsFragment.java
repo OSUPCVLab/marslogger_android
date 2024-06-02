@@ -21,13 +21,32 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 
+import android.os.Environment;
 import android.util.Range;
 import android.util.Size;
 
 import android.widget.Toast;
 
+import org.apache.commons.io.IOUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.ros.android.IPTool;
+import org.ros.android.MasterChooser;
+import org.ros.android.RosURIPattern;
+import org.ros.exception.RosRuntimeException;
+import org.ros.node.NodeConfiguration;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import timber.log.Timber;
 
@@ -163,7 +182,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
             cameraRez.setEntries(rez);
             cameraRez.setEntryValues(rezValues);
-            cameraRez.setDefaultValue(rezValues[defaultIndex]);
+            cameraRez.setValueIndex(defaultIndex);
 
             isoRange = characteristics.get(
                     CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
@@ -194,11 +213,83 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
 //            cameraFocus.setEntries(focuses);
 //            cameraFocus.setEntryValues(focuses);
-//            cameraFocus.setDefaultValue(focuses[0]);
+//            cameraFocus.setValueIndex(0);
 
         } catch (CameraAccessException | NullPointerException e) {
             e.printStackTrace();
         }
+        ListPreference networkInterfaces = (ListPreference)getPreferenceManager().findPreference("prefNetworkInterface");
+        try {
+            final List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
+            int numInterfaces = interfaces.size();
+            CharSequence[] entries = new CharSequence[numInterfaces];
+            CharSequence[] entriesValues = new CharSequence[numInterfaces];
+            int i = 0;
+            int d = 0;
+            for (NetworkInterface networkInterface : interfaces) {
+                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
+                    String ifname = networkInterface.getName();
+                    entries[i] = ifname;
+                    entriesValues[i] = ifname;
+                    if (ifname.contains("wlan"))
+                        d = i;
+                    ++i;
+                }
+            }
+            networkInterfaces.setEntries(Arrays.copyOfRange(entries, 0, i));
+            networkInterfaces.setEntryValues(Arrays.copyOfRange(entriesValues, 0, i));
+            networkInterfaces.setValueIndex(d);
+        } catch (SocketException e) {
+            throw new RosRuntimeException(e);
+        }
+        String prevMasterURI = sharedPreferences.getString("prefMasterURI", "");
+        if (prevMasterURI.length() == 0)
+            sharedPreferences.edit().putString("prefMasterURI", NodeConfiguration.DEFAULT_MASTER_URI.toString()).apply();
+
+        String currentHostIp = IPTool.getHostEthernetIp();
+        String ipnote = "";
+        String extdir = getActivity().getExternalFilesDir(
+                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
+        File configFile = new File(extdir, "MID360_config.json");
+        String lidarid = "";
+        if (configFile.exists()) {
+            try {
+                InputStream is = new FileInputStream(configFile);
+                String jsonTxt = IOUtils.toString(is);
+                JSONObject json = new JSONObject(jsonTxt);
+                JSONObject mid360 = json.getJSONObject("MID360");
+                JSONObject hostnet = mid360.getJSONObject("host_net_info");
+                String hostip = hostnet.getString("point_data_ip");
+                JSONArray lidarconfigs = json.getJSONArray("lidar_configs");
+                JSONObject lidarconfig = lidarconfigs.getJSONObject(0);
+                String lidarip = lidarconfig.getString("ip");
+//        ipnote += ". Previous host IP: " + hostip + ", lidar 0 IP: " + lidarip;
+                if (!hostip.equals(currentHostIp)) {
+                    ipnote += "Warning: The host address and lidar address are on different network segments, " +
+                            "the host_ip: " + currentHostIp + ", previous lidar_ip: " + lidarip;
+                    ipnote += "\nTo fix this, open livox viewer2 in a laptop, connect to mid360 by " +
+                            "setting the laptop ethernet static IP to: " + hostip;
+
+                    String[] hostparts = currentHostIp.split("[.]");
+                    String subnet = hostparts[2];
+                    String[] lidarparts = lidarip.split("[.]");
+                    lidarid = lidarparts[3];
+                    ipnote += "\nThen in livox viewer2 settings, set the lidar IP to 192.168." + subnet + "." + lidarid;
+                    ipnote += "\nAlso, set the points IP, IMU IP, and lidar info IP to " + currentHostIp;
+                } else {
+                    ipnote = "The host IP and lidar IP look consistent, host_ip: " + currentHostIp + " lidar_ip: " + lidarip;
+                }
+            } catch (Exception e) {
+                ipnote += "Exception in loading previous IP from " + configFile.getAbsolutePath();
+                e.printStackTrace();
+            }
+        } else {
+            ipnote += "No previous IP record found.";
+        }
+        sharedPreferences.edit().putString("prefIPNote", ipnote).apply();
+        if (lidarid.length() > 0)
+            sharedPreferences.edit().putString("prefLidarId", lidarid).apply();
+
     }
 
     /**
@@ -272,6 +363,15 @@ public class SettingsFragment extends PreferenceFragmentCompat
             } catch (CameraAccessException | NullPointerException e) {
                 e.printStackTrace();
             }
+        } else if (key.equals("prefMasterURI")) {
+            final String uri = sharedPreferences.getString("prefMasterURI", "");
+            final Pattern uriPattern = RosURIPattern.URI;
+            if(!uriPattern.matcher(uri).matches()) {
+                sharedPreferences.edit().putString("prefMasterURI", "Please enter valid URI").apply();
+            }
+        } else if (key.equals("prefNetworkInterface")) {
+            final String face = sharedPreferences.getString("prefNetworkInterface", "");
+            Timber.d("Using " + face + " interface.");
         }
     }
 

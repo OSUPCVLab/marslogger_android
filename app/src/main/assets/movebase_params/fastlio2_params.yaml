@@ -1,7 +1,7 @@
 # adapted from catkin_ws/src/FAST_LIO/launch/loc_mid360.launch
 
 # pcdmap will be passed via function call
-locmode: true
+locmode: false
 showmap: false
 feature_extract_enable: false
 point_filter_num: 4

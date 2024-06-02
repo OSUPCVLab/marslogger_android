@@ -20,8 +20,12 @@ import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.IBinder;
+import android.util.Log;
+
+import androidx.preference.PreferenceManager;
 
 import com.google.common.base.Preconditions;
 
@@ -41,7 +45,6 @@ import java.net.URISyntaxException;
 public abstract class RosActivity extends Activity {
 
   protected static final int MASTER_CHOOSER_REQUEST_CODE = 0;
-
   private final NodeMainExecutorServiceConnection nodeMainExecutorServiceConnection;
   private final String notificationTicker;
   private final String notificationTitle;
@@ -103,6 +106,7 @@ public abstract class RosActivity extends Activity {
 
     private NodeMainExecutorServiceListener serviceListener;
     private URI customMasterUri;
+    public final String TAG = "NodeMainExecutorService";
 
     public NodeMainExecutorServiceConnection(URI customUri) {
       super();
@@ -131,7 +135,8 @@ public abstract class RosActivity extends Activity {
       };
       nodeMainExecutorService.addListener(serviceListener);
       if (getMasterUri() == null) {
-        startMasterChooser();
+//        startMasterChooser();
+        configureRosWithPreferences();
       } else {
         init();
       }
@@ -249,6 +254,36 @@ public abstract class RosActivity extends Activity {
     // Call this method on super to avoid triggering our precondition in the
     // overridden startActivityForResult().
     super.startActivityForResult(new Intent(this, masterChooserActivity), masterChooserRequestCode);
+  }
+
+  public void configureRosWithPreferences() {
+    String host;
+    final SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+    String networkInterfaceName = sharedPreferences.getString("prefNetworkInterface", "");
+    // Handles the default selection and prevents possible errors
+    if (networkInterfaceName == null || networkInterfaceName.equals("")) {
+      host = getDefaultHostAddress();
+    } else {
+      try {
+        NetworkInterface networkInterface = NetworkInterface.getByName(networkInterfaceName);
+        host = InetAddressFactory.newNonLoopbackForNetworkInterface(networkInterface).getHostAddress();
+      } catch (SocketException e) {
+        throw new RosRuntimeException(e);
+      }
+    }
+    nodeMainExecutorService.setRosHostname(host);
+    if (sharedPreferences.getBoolean("prefNewMaster", true)) {
+      nodeMainExecutorService.startMaster(sharedPreferences.getBoolean("prefPrivateMaster", false));
+    } else {
+      URI uri;
+      try {
+        uri = new URI(sharedPreferences.getString("prefMasterURI", ""));
+      } catch (URISyntaxException e) {
+        throw new RosRuntimeException(e);
+      }
+      nodeMainExecutorService.setMasterUri(uri);
+    }
+    RosActivity.this.init(nodeMainExecutorService);
   }
 
   public URI getMasterUri() {

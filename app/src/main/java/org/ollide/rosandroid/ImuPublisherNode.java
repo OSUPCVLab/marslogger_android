@@ -31,7 +31,7 @@ public class ImuPublisherNode extends AbstractNodeMain {
     private float ax, ay, az;
     private float aRoll, aPitch, aYaw;
     private float roll, pitch, yaw;
-    private String imuFrameId;
+    private String imuFrameId = new String("phone_imu");
     private float prevRoll, prevPitch, prevYaw;
     private OnFrameIdChangeListener imuFrameIdChangeListener;
 

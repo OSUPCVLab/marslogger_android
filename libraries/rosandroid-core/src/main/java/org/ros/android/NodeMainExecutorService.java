@@ -149,27 +149,28 @@ public class NodeMainExecutorService extends Service implements NodeMainExecutor
 
   @Override
   public void shutdown() {
-    handler.post(new Runnable() {
-      @Override
-      public void run() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(NodeMainExecutorService.this);
-        builder.setMessage("Continue shutting down?");
-        builder.setPositiveButton("Shutdown", new OnClickListener() {
-          @Override
-          public void onClick(DialogInterface dialog, int which) {
-            forceShutdown();
-          }
-        });
-        builder.setNegativeButton("Cancel", new OnClickListener() {
-          @Override
-          public void onClick(DialogInterface dialog, int which) {
-          }
-        });
-        AlertDialog alertDialog = builder.create();
-        alertDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_TOAST);
-        alertDialog.show();
-      }
-    });
+    forceShutdown();
+//    handler.post(new Runnable() {
+//      @Override
+//      public void run() {
+//        AlertDialog.Builder builder = new AlertDialog.Builder(NodeMainExecutorService.this);
+//        builder.setMessage("Continue shutting down?");
+//        builder.setPositiveButton("Shutdown", new OnClickListener() {
+//          @Override
+//          public void onClick(DialogInterface dialog, int which) {
+//            forceShutdown();
+//          }
+//        });
+//        builder.setNegativeButton("Cancel", new OnClickListener() {
+//          @Override
+//          public void onClick(DialogInterface dialog, int which) {
+//          }
+//        });
+//        AlertDialog alertDialog = builder.create();
+//        alertDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_TOAST);
+//        alertDialog.show();
+//      }
+//    });
   }
 
   public void forceShutdown() {

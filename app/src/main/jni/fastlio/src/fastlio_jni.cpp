@@ -130,22 +130,35 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
   // comment out global localization for it's so slow.
   auto              match_begin_csm       = std::chrono::high_resolution_clock::now();
   int accum_frames = 2;
+
+  bool locmode = false;
+  nh.param<bool>("locmode", locmode, false);
+
   std::shared_ptr<GSMWrap> gsm(new GSMWrap(nh, accum_frames));
   std::string fn_path = pcdmap_path.substr(0, pcdmap_path.find_last_of('/')) + "/";
   std::string pcdbasename = "map_0.1.pcd";
-  gsm->LoadMap(fn_path, pcdbasename);
-
-  while (ros::ok()) {
-    if (gsm->loc_status()) {
-      map_T_lidar = gsm->init_pose();
-      log("Global scan matcher returned initial position %f %f %f", map_T_lidar.pose.position.x, map_T_lidar.pose.position.y, map_T_lidar.pose.position.z);
-      break;
+  if (locmode) {
+    gsm->LoadMap(fn_path, pcdbasename);
+    while (ros::ok()) {
+        if (gsm->loc_status()) {
+          map_T_lidar = gsm->init_pose();
+          log("Global scan matcher returned initial position %f %f %f", map_T_lidar.pose.position.x, map_T_lidar.pose.position.y, map_T_lidar.pose.position.z);
+          break;
+        }
+        ros::spinOnce();
+        rate.sleep();
     }
-    ros::spinOnce();
-    rate.sleep();
+  } else { // This is useless as map_T_lidar is not used in odometry mode.
+    map_T_lidar.pose.position.x = 0;
+    map_T_lidar.pose.position.y = 0;
+    map_T_lidar.pose.position.z = 0;
+    map_T_lidar.pose.orientation.x = 0;
+    map_T_lidar.pose.orientation.y = 0;
+    map_T_lidar.pose.orientation.z = 0;
+    map_T_lidar.pose.orientation.w = 1;
   }
   gsm.reset(); // remove the gsm node.
-  auto            match_end_csm = std::chrono::high_resolution_clock::now();
+  auto   match_end_csm = std::chrono::high_resolution_clock::now();
   double delta_ms = time_inc_ms(match_end_csm, match_begin_csm);
   log("Global scan matcher took %f ms", delta_ms);
   std::vector<double> position{map_T_lidar.pose.position.x, map_T_lidar.pose.position.y, map_T_lidar.pose.position.z};
@@ -153,9 +166,6 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
   std::vector<double> qxyzw{map_T_lidar.pose.orientation.x, map_T_lidar.pose.orientation.y, map_T_lidar.pose.orientation.z, map_T_lidar.pose.orientation.w};
   nh.setParam("/mapping/init_world_qxyzw_lidar", qxyzw);
   nh.setParam("/pcdmap", pcdmap_path);
-
-  bool locmode = false;
-  nh.param<bool>("locmode", locmode, false);
 
   fastlio::LaserMapping node(nh);
   global_pose_publisher = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/amcl_pose", 2, true);

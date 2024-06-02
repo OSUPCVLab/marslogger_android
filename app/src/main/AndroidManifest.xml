@@ -30,11 +30,6 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme.NoActionBar">
         <activity
-            android:name=".PhotoCaptureActivity"
-            android:label="@string/title_activity_photo_capture"
-            android:theme="@style/AppTheme.NoActionBar.NoActionBar">
-        </activity>
-        <activity
             android:name=".NavActivity"
             android:label="@string/title_activity_nav"
             android:screenOrientation="portrait"

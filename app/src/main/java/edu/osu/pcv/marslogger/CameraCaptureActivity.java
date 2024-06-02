@@ -38,6 +38,7 @@ import android.os.Handler;
 import android.os.Message;
 
 import androidx.annotation.RequiresApi;
+import androidx.preference.PreferenceManager;
 
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -369,10 +370,10 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private String hostName;
 
     private FastLioNativeNode fastlioNativeNode;
-    private LivoxRosDriver2NativeNode livoxNativeNode;
+    private LivoxRosDriver2NativeNode livoxNativeNode = null;
 
     private LaserLoggerNativeNode laserLoggerNativeNode;
-    private PathListenerNode pathListenerNode;
+    private PathListenerNode pathListenerNode = null;
     private ParameterLoaderNode mParameterLoaderNode;
     private int lidarId = 0;
 
@@ -404,12 +405,8 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         positionTextView = findViewById(R.id.currentPositionText);
         lidarIdTextView = findViewById(R.id.lidarIdText);
 
-        String extdir = getExternalFilesDir(
-                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
-        File configFile = new File(extdir, "MID360_config.json");
-        String prevLidarId = IPTool.getPreviousLidarId(configFile);
-        if (prevLidarId.length() > 0)
-            lidarId = Integer.parseInt(prevLidarId);
+        lidarId = Integer.parseInt(PreferenceManager.getDefaultSharedPreferences(this).
+                getString("prefLidarId", "0"));
         lidarIdTextView.setText(String.valueOf(lidarId));
 
         // Load raw resources
@@ -497,12 +494,14 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             }
         });
         mImuManager.register();
+        if (nodeMainExecutor != null && livoxNativeNode == null) {
+            init(nodeMainExecutor);
+        }
     }
 
     @Override
     protected void onPause() {
         Timber.d("onPause -- releasing camera");
-        super.onPause();
         // no more frame metadata will be saved during pause
         if (mCamera2Proxy != null) {
             mCamera2Proxy.releaseCamera();
@@ -518,15 +517,18 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         });
         mGLView.onPause();
         mImuManager.unregister();
+        stopPathListener();
+        stopLivoxRosDriver2();
+        super.onPause();
         Timber.d("onPause complete");
     }
 
     @Override
     protected void onDestroy() {
         Timber.d("onDestroy");
-        super.onDestroy();
         nodeMainExecutor.shutdown();
         mCameraHandler.invalidateHandler();     // paranoia
+        super.onDestroy();
     }
 
     // spinner selected
@@ -571,14 +573,14 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
             startFastLio();
-            startPathListener();
-            startLaserLogging();
+            startLaserLogging(outputDir + File.separator + "mid360.bag");
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
             mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();
             stopLaserLogging();
+            stopFastLio();
         }
         mGLView.queueEvent(new Runnable() {
             @Override
@@ -699,6 +701,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         spe.apply();
 
         startLivoxRosDriver2();
+        startPathListener();
     }
 
     /**
@@ -783,17 +786,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         return configFile.getAbsolutePath();
     }
 
-    private String getUniqueBagPath() {
-        String extdir = getExternalFilesDir(
-                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath() + "/rosbags";
-        if (!new File(extdir).exists()) {
-            new File(extdir).mkdir();
-        }
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault());
-        String currentDateandTime = sdf.format(new Date());
-        return extdir + "/" + currentDateandTime + ".bag";
-    }
-
     private void startFastLio() {
         Log.i(TAG, "Starting native fastlio node wrapper...");
         NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
@@ -805,6 +797,10 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         extraArgs[0] = pcdmappath;
         fastlioNativeNode = new FastLioNativeNode(extraArgs);
         nodeMainExecutor.execute(fastlioNativeNode, nodeConfiguration);
+    }
+
+    private void stopFastLio() {
+        fastlioNativeNode.shutdown();
     }
 
     private void startLivoxRosDriver2() {
@@ -826,6 +822,11 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         extraArgs[0] = userconfigpath;
         livoxNativeNode = new LivoxRosDriver2NativeNode(extraArgs);
         nodeMainExecutor.execute(livoxNativeNode, nodeConfiguration);
+    }
+
+    private void stopLivoxRosDriver2() {
+        livoxNativeNode.shutdown();
+        livoxNativeNode = null;
     }
 
     private void startPathListener() {
@@ -856,14 +857,19 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         nodeMainExecutor.execute(pathListenerNode, nodeConfiguration);
     }
 
-    private void startLaserLogging() {
+    private void stopPathListener() {
+        pathListenerNode.shutdown();
+        pathListenerNode = null;
+    }
+
+    private void startLaserLogging(String bagname) {
         Log.i(TAG, "Starting native laser logging node wrapper...");
         NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
         nodeConfiguration.setMasterUri(masterUri);
         nodeConfiguration.setNodeName(LaserLoggerNativeNode.nodeName);
-        String rosbagPath = getUniqueBagPath();
+
         String[] extraArgs = new String[1];
-        extraArgs[0] = rosbagPath;
+        extraArgs[0] = bagname;
         laserLoggerNativeNode = new LaserLoggerNativeNode(extraArgs);
         nodeMainExecutor.execute(laserLoggerNativeNode, nodeConfiguration);
     }

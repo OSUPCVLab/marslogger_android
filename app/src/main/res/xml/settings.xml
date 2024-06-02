@@ -49,4 +49,47 @@
             android:defaultValue="1" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Lidar Settings" >
+        <ListPreference
+            android:key="prefNetworkInterface"
+            android:title="Select network interface"
+            android:summary="Select the proper network interface to start a ros master" />
+
+        <EditTextPreference
+            android:key="prefMasterURI"
+            android:title="Master URI"
+            android:summary="Master URI to be created or used" />
+
+        <CheckBoxPreference
+            android:title="Create a new master"
+            android:defaultValue="true"
+            android:summary="Create a new master or use the existing master"
+            android:key="prefNewMaster" />
+
+        <CheckBoxPreference
+            android:title="Create a private master"
+            android:defaultValue="false"
+            android:summary="Create a private or public master"
+            android:key="prefPrivateMaster" />
+
+        <EditTextPreference
+            android:key="prefLidarId"
+            android:title="Lidar Id"
+            android:summary="Last 3 digits of the mid360 serial number"
+            android:defaultValue="157" />
+
+        <EditTextPreference
+            android:key="prefIPNote"
+            android:title="Note on IP"
+            android:summary="Note about IP settings"
+            android:defaultValue="A note on lidar IP addresses" />
+
+        <EditTextPreference
+            android:key="prefPlaceholder"
+            android:title="Placeholder"
+            android:summary="Placeholder"
+            android:defaultValue="A placeholder" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>
