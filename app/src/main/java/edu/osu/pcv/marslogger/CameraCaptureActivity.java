@@ -573,11 +573,13 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                     outputDir + File.separator + "movie_metadata.csv");
             startFastLio();
             startLaserLogging(outputDir + File.separator + "mid360.bag");
+            pathListenerNode.setRecording(true);
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
             mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();
+            pathListenerNode.setRecording(false);
             stopLaserLogging();
             stopFastLio();
         }
@@ -847,6 +849,17 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                                         String s = "Odom: " + String.format("%.2f", x) + "," +
                                                 String.format("%.2f", y) + "," + String.format("%.2f", z);
                                         positionTextView.setText(s);
+                                    }
+                                }
+                        );
+                    }
+                    @Override
+                    public void onNumFrameUpdate(int numframes) {
+                        runOnUiThread(
+                                new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        msgCountTextView.setText(String.valueOf(numframes));
                                     }
                                 }
                         );

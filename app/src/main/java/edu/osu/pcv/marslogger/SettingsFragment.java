@@ -231,7 +231,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
                     String ifname = networkInterface.getName();
                     entries[i] = ifname;
                     entriesValues[i] = ifname;
-                    if (ifname.contains("wlan"))
+                    if (ifname.startsWith("eth"))
                         d = i;
                     ++i;
                 }
