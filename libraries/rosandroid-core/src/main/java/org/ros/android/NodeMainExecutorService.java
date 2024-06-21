@@ -199,7 +199,6 @@ public class NodeMainExecutorService extends Service implements NodeMainExecutor
 
   @Override
   public void onDestroy() {
-    toast("Shutting down...");
     nodeMainExecutor.shutdown();
     if (rosCore != null) {
       rosCore.shutdown();

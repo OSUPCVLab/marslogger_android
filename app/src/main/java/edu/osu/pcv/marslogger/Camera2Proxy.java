@@ -57,6 +57,7 @@ public class Camera2Proxy {
 
     private Activity mActivity;
     private static SharedPreferences mSharedPreferences;
+    private boolean mTapFocus;
     private String mCameraIdStr = "";
     private Size mPreviewSize;
     private Size mVideoSize;
@@ -206,6 +207,7 @@ public class Camera2Proxy {
     public Camera2Proxy(Activity activity) {
         mActivity = activity;
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        mTapFocus = mSharedPreferences.getBoolean("switchTapFocus", false);
         mCameraManager = (CameraManager) mActivity.getSystemService(Context.CAMERA_SERVICE);
         mOrientationEventListener = new OrientationEventListener(mActivity) {
             @Override
@@ -440,7 +442,7 @@ public class Camera2Proxy {
             } // else may occur on an emulated device.
         }
 
-        boolean manualControl = mSharedPreferences.getBoolean("switchManualControl", false);
+        boolean manualControl = mSharedPreferences.getBoolean("switchManualControlIsoAndExposure", false);
         if (manualControl) {
             float exposureTimeMs = (float) exposureNanos / 1e6f;
             String exposureTimeMsStr = mSharedPreferences.getString(
@@ -495,18 +497,22 @@ public class Camera2Proxy {
 //                mPreviewRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, mScalarCropRegion);
 //            }
 
-            // We disable customizing focus distance by user input because
-            // it is less flexible than tap to focus.
-//            boolean manualControl = mSharedPreferences.getBoolean("switchManualControl", false);
-//            if (manualControl) {
-//                String focus = mSharedPreferences.getString("prefFocusDistance", "5.0");
-//                Float focusDistance = Float.parseFloat(focus);
-//                mPreviewRequestBuilder.set(
-//                        CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-//                mPreviewRequestBuilder.set(
-//                        CaptureRequest.LENS_FOCUS_DISTANCE, focusDistance);
-//                Timber.d("Focus distance set to %f", focusDistance);
-//            }
+            if (!mTapFocus) {
+                mPreviewRequestBuilder.set(
+                        CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+                float minFocalDist = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+                Float hyperFocalDistKey = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE);
+                float hyperFocalDist = minFocalDist / 2;
+                if (hyperFocalDistKey != null) {
+                    hyperFocalDist = hyperFocalDistKey; // focus at infinity
+                } else {
+                    Timber.w("Hyper Focal Distance unavailable. Set to %.5f!", hyperFocalDist);
+                }
+                float focalDistance = hyperFocalDist;
+                mPreviewRequestBuilder.set(
+                        CaptureRequest.LENS_FOCUS_DISTANCE, focalDistance);
+                Timber.d("Focus distance set to %f, note minFocalDist %.5f", focalDistance, minFocalDist);
+            }
 
             List<Surface> surfaces = new ArrayList<>();
             if (previewForSnapshot) {
@@ -724,6 +730,8 @@ public class Camera2Proxy {
 
 
     void changeManualFocusPoint(ManualFocusConfig focusConfig) {
+        if (!mTapFocus)
+            return;
         float eventX = focusConfig.mEventX;
         float eventY = focusConfig.mEventY;
         int viewWidth = focusConfig.mViewWidth;

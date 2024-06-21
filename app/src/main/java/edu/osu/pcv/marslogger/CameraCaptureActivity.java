@@ -452,7 +452,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             ManualFocusConfig focusConfig =
                     new ManualFocusConfig(event.getX(), event.getY(), mGLView.getWidth(), mGLView.getHeight());
             Timber.d(focusConfig.toString());
-            Toast.makeText(getApplicationContext(), "Changing focus point...", Toast.LENGTH_SHORT).show();
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
