@@ -74,7 +74,7 @@ public class FocalLengthHelper {
      */
     public SizeF getFocalLengthPixel() {
         if (mIntrinsic != null && mIntrinsic[0] > 1.0) {
-            Timber.d("Focal length set as (%f, %f)",mIntrinsic[0], mIntrinsic[1]);
+//            Timber.d("Focal length set as (%f, %f)",mIntrinsic[0], mIntrinsic[1]);
             return new SizeF(mIntrinsic[0], mIntrinsic[1]);
         }
 
