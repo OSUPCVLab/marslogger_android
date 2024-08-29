@@ -31,7 +31,7 @@ import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.ros.android.IPTool;
-import org.ros.android.MasterChooser;
+//import org.ros.android.MasterChooser;
 import org.ros.android.RosURIPattern;
 import org.ros.exception.RosRuntimeException;
 import org.ros.node.NodeConfiguration;
@@ -276,8 +276,10 @@ public class SettingsFragment extends PreferenceFragmentCompat
                     lidarid = lidarparts[3];
                     ipnote += "\nThen in livox viewer2 settings, set the lidar IP to 192.168." + subnet + "." + lidarid;
                     ipnote += "\nAlso, set the points IP, IMU IP, and lidar info IP to " + currentHostIp;
+                    ipnote += "\nDo not start recording in case of inconsistent IPs as recording will override the previous config.";
                 } else {
                     ipnote = "The host IP and lidar IP look consistent, host_ip: " + currentHostIp + " lidar_ip: " + lidarip;
+                    ipnote += "\nBut this may be wrong if recording had been attempted in case of inconsistent IPs.";
                 }
             } catch (Exception e) {
                 ipnote += "Exception in loading previous IP from " + configFile.getAbsolutePath();

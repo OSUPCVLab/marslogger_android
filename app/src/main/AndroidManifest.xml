@@ -52,7 +52,7 @@
             android:label="About"
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme" />
-	    <activity android:name="org.ros.android.MasterChooser" />
+<!--	    <activity android:name="org.ros.android.MasterChooser" />-->
         <service android:name="org.ros.android.NodeMainExecutorService"
             android:exported="true">
             <intent-filter>
