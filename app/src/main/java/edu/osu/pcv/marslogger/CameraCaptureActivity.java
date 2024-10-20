@@ -96,6 +96,7 @@ import org.ros.node.NodeMainExecutor;
 import org.ros.node.NodeListener;
 
 import org.ros.rosjava_tutorial_native_node.FastLioNativeNode;
+import org.ros.rosjava_tutorial_native_node.FasterLioNativeNode;
 import org.ros.rosjava_tutorial_native_node.LivoxRosDriver2NativeNode;
 import org.ros.rosjava_tutorial_native_node.LaserLoggerNativeNode;
 
@@ -352,12 +353,15 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     static {
         System.loadLibrary("laser_logger_jni");
         System.loadLibrary("fastlio_jni");
+        System.loadLibrary("fasterlio_jni");
         System.loadLibrary("livox_ros_driver2_jni");
     }
 
     private static ArrayList<Pair<String, String>> mResourcesToLoad = new ArrayList<Pair<String, String>>() {{
         add(new Pair<String, String>("movebase_params/fastlio2_params.yaml", "/"));
         // We use the global namespace for fastlio2.
+        add(new Pair<String, String>("movebase_params/fasterlio_mid360.yaml", "/"));
+        // We use the global namespace for fasterlio.
         add(new Pair<String, String>("movebase_params/livox_ros_driver2_params.yaml", "/"));
         // We use the global namespace for livox ros driver2.
         add(new Pair<String, String>("movebase_params/fast_csm_icp_params.yaml", "/"));
@@ -370,6 +374,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private String hostName;
 
     private FastLioNativeNode fastlioNativeNode;
+    private FasterLioNativeNode fasterLioNativeNode;
     private LivoxRosDriver2NativeNode livoxNativeNode = null;
 
     private LaserLoggerNativeNode laserLoggerNativeNode;
@@ -571,7 +576,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mImuManager.startRecording(inertialFile);
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
-            startFastLio();
+            startFasterLio();
             startLaserLogging(outputDir + File.separator + "mid360.bag");
             pathListenerNode.setRecording(true);
         } else {
@@ -581,7 +586,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mTimeBaseManager.stopRecording();
             pathListenerNode.setRecording(false);
             stopLaserLogging();
-            stopFastLio();
+            stopFasterLio();
         }
         mGLView.queueEvent(new Runnable() {
             @Override
@@ -802,6 +807,22 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
     private void stopFastLio() {
         fastlioNativeNode.shutdown();
+    }
+
+    private void startFasterLio() {
+        Log.i(TAG, "Starting native fasterlio node wrapper...");
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(FasterLioNativeNode.nodeName);
+        String pcdmap_path = "/fasterlio/with/loc/not/implemented.pcd";
+        String[] extraArgs = new String[1];
+        extraArgs[0] = pcdmap_path;
+        fasterLioNativeNode = new FasterLioNativeNode();
+        nodeMainExecutor.execute(fasterLioNativeNode, nodeConfiguration);
+    }
+
+    private void stopFasterLio() {
+        fasterLioNativeNode.shutdown();
     }
 
     private void startLivoxRosDriver2() {

@@ -77,7 +77,7 @@ inline void check_systemclock() {
   }
   log("system clock time %ld, ros time %ld, diff %d", current_time, ros_time, diff);
 }
-// TODO: run fasterlio on mid360 data and adjust config yamls.
+
 JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_execute(
     JNIEnv *env, jobject obj, jstring rosMasterUri, jstring rosHostname, jstring rosNodeName,
     jobjectArray remappingArguments) {
@@ -163,6 +163,7 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
   std::vector<double> qxyzw{map_T_lidar.pose.orientation.x, map_T_lidar.pose.orientation.y, map_T_lidar.pose.orientation.z, map_T_lidar.pose.orientation.w};
   nh.setParam("/mapping/init_world_qxyzw_lidar", qxyzw);
   nh.setParam("/pcdmap", pcdmap_path);
+  nh.setParam("/runtime_pos_log_enable", false);
 
   faster_lio::LaserMappingWrap laser_mapping;
   laser_mapping.InitROS(nh);
