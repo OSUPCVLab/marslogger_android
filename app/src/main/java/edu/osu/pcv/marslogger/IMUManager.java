@@ -29,17 +29,17 @@ public class IMUManager implements SensorEventListener {
     private final long mInterpolationTimeResolution = 500; // nanoseconds
     private int mSensorRate = SensorManager.SENSOR_DELAY_FASTEST;
 
-    public static String ImuHeader = "Timestamp[nanosec],gx[rad/s],gy[rad/s],gz[rad/s]," +
-            "ax[m/s^2],ay[m/s^2],az[m/s^2],mx[uT],my[uT],mz[uT],Unix time[nanosec]\n";
+    public static String ImuHeader = "sensor uptime[sec],gx[rad/s],gy[rad/s],gz[rad/s]," +
+            "ax[m/s^2],ay[m/s^2],az[m/s^2],mx[uT],my[uT],mz[uT],host unix time[sec]\n";
 
     private class SensorPacket {
         long timestamp; // nanoseconds
-        long unixTime; // milliseconds
+        long unixTimeNsecs; // nanoseconds
         float[] values;
-
-        SensorPacket(long time, long unixTimeMillis, float[] vals) {
+        final long kSecToNano = 1000000000;
+        SensorPacket(long time, long unixTimeNanos, float[] vals) {
             timestamp = time;
-            unixTime = unixTimeMillis;
+            unixTimeNsecs = unixTimeNanos;
             values = vals;
         }
 
@@ -47,11 +47,11 @@ public class IMUManager implements SensorEventListener {
         public String toString() {
             String delimiter = ",";
             StringBuilder sb = new StringBuilder();
-            sb.append(timestamp);
+            sb.append(String.format("%d.%09d", timestamp / kSecToNano, timestamp % kSecToNano));
             for (int index = 0; index < values.length; ++index) {
                 sb.append(delimiter + values[index]);
             }
-            sb.append(delimiter + unixTime + "000000");
+            sb.append(delimiter + String.format("%d.%09d", unixTimeNsecs / kSecToNano, unixTimeNsecs % kSecToNano));
             return sb.toString();
         }
     }
@@ -141,7 +141,7 @@ public class IMUManager implements SensorEventListener {
                 mAccelData.add(latestAccel);
             } else { // linearly interpolate the accel data at the gyro timestamp
                 float[] gyro_accel = new float[9];
-                SensorPacket sp = new SensorPacket(oldestGyro.timestamp, oldestGyro.unixTime, gyro_accel);
+                SensorPacket sp = new SensorPacket(oldestGyro.timestamp, oldestGyro.unixTimeNsecs, gyro_accel);
                 gyro_accel[0] = oldestGyro.values[0];
                 gyro_accel[1] = oldestGyro.values[1];
                 gyro_accel[2] = oldestGyro.values[2];
@@ -235,12 +235,12 @@ public class IMUManager implements SensorEventListener {
 
     @Override
     public final void onSensorChanged(SensorEvent event) {
-        long unixTime = System.currentTimeMillis();
+        long unixTimeNanos = TimeHelper.upTimeToUnixTime(event.timestamp);
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            SensorPacket sp = new SensorPacket(event.timestamp, unixTime, event.values);
+            SensorPacket sp = new SensorPacket(event.timestamp, unixTimeNanos, event.values);
             mAccelData.add(sp);
         } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
-            SensorPacket sp = new SensorPacket(event.timestamp, unixTime, event.values);
+            SensorPacket sp = new SensorPacket(event.timestamp, unixTimeNanos, event.values);
             mGyroData.add(sp);
             SensorPacket syncedData = syncInertialData();
 
@@ -252,7 +252,7 @@ public class IMUManager implements SensorEventListener {
                 }
             }
         } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            SensorPacket sp = new SensorPacket(event.timestamp, unixTime, event.values);
+            SensorPacket sp = new SensorPacket(event.timestamp, unixTimeNanos, event.values);
             mMagData.add(sp);
         }
     }

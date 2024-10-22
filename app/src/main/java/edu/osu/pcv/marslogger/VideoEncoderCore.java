@@ -57,21 +57,23 @@ public class VideoEncoderCore {
     private MediaCodec.BufferInfo mBufferInfo;
     private int mTrackIndex;
     private boolean mMuxerStarted;
-    private BufferedWriter mFrameMetadataWriter = null;
+    private BufferedWriter mFrameTimeWriter = null;
 
-    private static String FrameTimeHeader = "Frame timestamp[nanosec],Unix time[nanosec]\n";
+    private static String FrameTimeHeader = "Frame sensor time[sec],host unix time[sec]\n";
     class TimePair {
         public Long sensorTimeMicros;
-        public long unixTimeMillis;
-        public TimePair(Long sensorTime, long unixTime) {
+        public long unixTimeNanos;
+        public TimePair(Long sensorTime) {
             sensorTimeMicros = sensorTime;
-            unixTimeMillis = unixTime;
+            unixTimeNanos = TimeHelper.upTimeToUnixTime(sensorTimeMicros * 1000);
         }
         public String toString() {
             String delimiter = ",";
             StringBuilder sb = new StringBuilder();
-            sb.append(sensorTimeMicros + "000");
-            sb.append(delimiter + unixTimeMillis + "000000");
+            final long kSecToMicro = 1000000;
+            final long kSecToNano = 1000000000;
+            sb.append(String.format("%d.%06d", sensorTimeMicros / kSecToMicro, sensorTimeMicros % kSecToMicro));
+            sb.append(delimiter + String.format("%d.%09d", unixTimeNanos / kSecToNano, unixTimeNanos % kSecToNano));
             return sb.toString();
         }
     }
@@ -83,7 +85,7 @@ public class VideoEncoderCore {
      * Configures encoder and muxer state, and prepares the input Surface.
      */
     public VideoEncoderCore(int width, int height, int bitRate,
-                            String outputFile, String metaFile)
+                            String outputFile, String timeFile)
             throws IOException {
         mBufferInfo = new MediaCodec.BufferInfo();
 
@@ -127,8 +129,8 @@ public class VideoEncoderCore {
         mMuxerStarted = false;
 
         try {
-            mFrameMetadataWriter = new BufferedWriter(
-                    new FileWriter(metaFile, false));
+            mFrameTimeWriter = new BufferedWriter(
+                    new FileWriter(timeFile, false));
         } catch (IOException err) {
             Timber.e(err, "IOException in opening frameMetadataWriter.");
         }
@@ -159,18 +161,18 @@ public class VideoEncoderCore {
             mMuxer.release();
             mMuxer = null;
         }
-        if (mFrameMetadataWriter != null) {
+        if (mFrameTimeWriter != null) {
             try {
-                mFrameMetadataWriter.write(FrameTimeHeader);
+                mFrameTimeWriter.write(FrameTimeHeader);
                 for (TimePair value : mTimeArray) {
-                    mFrameMetadataWriter.write(value.toString() + "\n");
+                    mFrameTimeWriter.write(value.toString() + "\n");
                 }
-                mFrameMetadataWriter.flush();
-                mFrameMetadataWriter.close();
+                mFrameTimeWriter.flush();
+                mFrameTimeWriter.close();
             } catch (IOException err) {
                 Timber.e(err, "IOException in closing frameMetadataWriter.");
             }
-            mFrameMetadataWriter = null;
+            mFrameTimeWriter = null;
         }
     }
 
@@ -240,8 +242,7 @@ public class VideoEncoderCore {
                     // adjust the ByteBuffer values to match BufferInfo (not needed?)
                     encodedData.position(mBufferInfo.offset);
                     encodedData.limit(mBufferInfo.offset + mBufferInfo.size);
-                    mTimeArray.add(new TimePair(mBufferInfo.presentationTimeUs,
-                            System.currentTimeMillis()));
+                    mTimeArray.add(new TimePair(mBufferInfo.presentationTimeUs));
                     mMuxer.writeSampleData(mTrackIndex, encodedData, mBufferInfo);
                     if (VERBOSE) {
                         Timber.d("sent %d bytes to muxer, ts=%d",

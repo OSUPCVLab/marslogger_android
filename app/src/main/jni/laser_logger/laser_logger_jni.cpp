@@ -33,13 +33,26 @@ void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     bag.write("/scan", msg->header.stamp, msg);
 }
 
+ros::Time upTimeToUnixTime(const ros::Time &upTime) {
+    // Get the current high-resolution uptime in nanoseconds
+    uint64_t current_high_uptime_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    // Get the current system time in nanoseconds (Unix time)
+    uint64_t current_unix_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+
+    uint64_t corrected_unix_time_ns = current_unix_time_ns - (current_high_uptime_ns - upTime.toNSec());
+    return ros::Time().fromNSec(corrected_unix_time_ns);
+}
+
 void pointCloud2Callback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
-    bag.write("/livox/lidar", msg->header.stamp, msg);
+    bag.write("/livox/lidar", upTimeToUnixTime(msg->header.stamp), msg);
     pcmsgCount++;
 }
 
 void imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
-    bag.write("/livox/imu", msg->header.stamp, msg);
+    bag.write("/livox/imu", upTimeToUnixTime(msg->header.stamp), msg);
     imumsgCount++;
 }
 

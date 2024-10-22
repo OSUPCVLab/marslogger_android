@@ -64,7 +64,9 @@ inline double time_inc_ms(std::chrono::high_resolution_clock::time_point &t_end,
   return std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_begin).count() * 1000;
 }
 
-inline void check_systemclock() {
+// Warn: call this function after ros::NodeHandle nh;
+inline void check_system_clock() {
+  uint64_t high_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
   ros::Time t = ros::Time::now();
   uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
   uint64_t ros_time = t.toNSec();
@@ -75,7 +77,7 @@ inline void check_systemclock() {
     diff = ros_time - current_time;
     diff = -diff;
   }
-  log("system clock time %ld, ros time %ld, diff %d", current_time, ros_time, diff);
+  log("high time %ld, system clock time %ld, ros time %ld, diff %d", high_time, current_time, ros_time, diff);
 }
 
 JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_execute(
@@ -111,7 +113,7 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
       argv[argc] = refs[i];
       argc++;
   }
-  std::string pcdmap_path((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 0), NULL));
+  std::string output_dir((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 0), NULL));
   ros::init(argc, &argv[0], node_name.c_str());
 
   // Release JNI UTF characters
@@ -132,10 +134,14 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
   nh.param<bool>("locmode", locmode, false);
 
   std::shared_ptr<GSMWrap> gsm(new GSMWrap(nh, accum_frames));
-  std::string fn_path = pcdmap_path.substr(0, pcdmap_path.find_last_of('/')) + "/";
-  std::string pcdbasename = "map_0.1.pcd";
+
+  // check_system_clock();
+
   if (locmode) {
-    gsm->LoadMap(fn_path, pcdbasename);
+    std::string pcdmap_path = "fasterlio/loc/not/implemented.pcd";
+    std::string pcdmap_dir = pcdmap_path.substr(0, pcdmap_path.find_last_of('/')) + "/";
+    std::string pcdbasename = "map_0.1.pcd";
+    gsm->LoadMap(pcdmap_dir, pcdbasename);
     while (ros::ok()) {
         if (gsm->loc_status()) {
           map_T_lidar = gsm->init_pose();
@@ -162,7 +168,6 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
   nh.setParam("/mapping/init_world_t_lidar", position);
   std::vector<double> qxyzw{map_T_lidar.pose.orientation.x, map_T_lidar.pose.orientation.y, map_T_lidar.pose.orientation.z, map_T_lidar.pose.orientation.w};
   nh.setParam("/mapping/init_world_qxyzw_lidar", qxyzw);
-  nh.setParam("/pcdmap", pcdmap_path);
   nh.setParam("/runtime_pos_log_enable", false);
 
   faster_lio::LaserMappingWrap laser_mapping;
@@ -188,8 +193,8 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
       status = ros::ok();
       rate.sleep();
   }
-  laser_mapping.Finish();
-  std::string traj_log_file = fn_path + "faster_lio_traj.txt";
+  laser_mapping.Finish(output_dir);
+  std::string traj_log_file = output_dir + "/faster_lio_traj.txt";
   laser_mapping.Savetrajectory(traj_log_file, laser_mapping.I_p_B(), laser_mapping.I_q_B());
 
   log("Exiting from fasterlio JNI call.");

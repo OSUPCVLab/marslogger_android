@@ -62,20 +62,6 @@ inline double time_inc_ms(std::chrono::high_resolution_clock::time_point &t_end,
   return std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_begin).count() * 1000;
 }
 
-inline void check_systemclock() {
-  ros::Time t = ros::Time::now();
-  uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-  uint64_t ros_time = t.toNSec();
-  int diff;
-  if (current_time > ros_time) {
-    diff = (current_time - ros_time);
-  } else {
-    diff = ros_time - current_time;
-    diff = -diff;
-  }
-  log("system clock time %ld, ros time %ld, diff %d", current_time, ros_time, diff);
-}
-
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_FastLioNativeNode
  * Method:    execute

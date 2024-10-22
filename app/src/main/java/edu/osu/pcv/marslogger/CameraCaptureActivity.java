@@ -563,10 +563,10 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         if (mRecordingEnabled) {
             String outputDir = renewOutputDir();
             String outputFile = outputDir + File.separator + "movie.mp4";
-            String metaFile = outputDir + File.separator + "frame_timestamps.txt";
+            String timeFile = outputDir + File.separator + "frame_timestamps.txt";
             String basename = outputDir.substring(outputDir.lastIndexOf("/")+1);
             mOutputDirText.setText(basename);
-            mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
+            mRenderer.resetOutputFiles(outputFile, timeFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
             String gpsFile = outputDir + File.separator + "gps.csv";
             String allGpsFile = outputDir + File.separator + "all_gps.csv";
@@ -576,7 +576,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mImuManager.startRecording(inertialFile);
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
-            startFasterLio();
+            startFasterLio(outputDir);
             startLaserLogging(outputDir + File.separator + "mid360.bag");
             pathListenerNode.setRecording(true);
         } else {
@@ -809,15 +809,14 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         fastlioNativeNode.shutdown();
     }
 
-    private void startFasterLio() {
+    private void startFasterLio(String outputDir) {
         Log.i(TAG, "Starting native fasterlio node wrapper...");
         NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
         nodeConfiguration.setMasterUri(masterUri);
         nodeConfiguration.setNodeName(FasterLioNativeNode.nodeName);
-        String pcdmap_path = "/fasterlio/with/loc/not/implemented.pcd";
         String[] extraArgs = new String[1];
-        extraArgs[0] = pcdmap_path;
-        fasterLioNativeNode = new FasterLioNativeNode();
+        extraArgs[0] = outputDir;
+        fasterLioNativeNode = new FasterLioNativeNode(extraArgs);
         nodeMainExecutor.execute(fasterLioNativeNode, nodeConfiguration);
     }
 
@@ -988,7 +987,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
     private CameraHandler mCameraHandler;
     private TextureMovieEncoder mVideoEncoder;
     private String mOutputFile;
-    private String mMetadataFile;
+    private String mTimeFile;
 
     private FullFrameRect mFullScreen;
 
@@ -1038,9 +1037,9 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
         mNewFilter = CameraCaptureActivity.FILTER_NONE;
     }
 
-    public void resetOutputFiles(String outputFile, String metaFile) {
+    public void resetOutputFiles(String outputFile, String timeFile) {
         mOutputFile = outputFile;
-        mMetadataFile = metaFile;
+        mTimeFile = timeFile;
     }
 
     /**
@@ -1232,7 +1231,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                                     CameraUtils.calcBitRate(mVideoFrameWidth, mVideoFrameHeight,
                                             VideoEncoderCore.FRAME_RATE),
                                     EGL14.eglGetCurrentContext(),
-                                    mMetadataFile));
+                                    mTimeFile));
                     mRecordingStatus = RECORDING_ON;
                     break;
                 case RECORDING_RESUMED:

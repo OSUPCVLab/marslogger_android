@@ -279,7 +279,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
                     ipnote += "\nDo not start recording in case of inconsistent IPs as recording will override the previous config.";
                 } else {
                     ipnote = "The host IP and lidar IP look consistent, host_ip: " + currentHostIp + " lidar_ip: " + lidarip;
-                    ipnote += "\nBut this may be wrong if recording had been attempted in case of inconsistent IPs.";
+                    ipnote += ". But this may be wrong if recording had been attempted in case of inconsistent IPs.";
                 }
             } catch (Exception e) {
                 ipnote += "Exception in loading previous IP from " + configFile.getAbsolutePath();
