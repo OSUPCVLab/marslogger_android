@@ -8,4 +8,7 @@
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="text_margin">8dp</dimen>
 
+    <dimen name="navigation_drawer_width">200dp</dimen>
+    <dimen name="dialog_width">320dp</dimen>
+    <dimen name="dialog_height">420dp</dimen>
 </resources>

@@ -75,6 +75,8 @@ import javax.microedition.khronos.opengles.GL10;
 
 import edu.osu.pcv.marslogger.gles.FullFrameRect;
 import edu.osu.pcv.marslogger.gles.Texture2dProgram;
+import sg.edu.nus.comp.android3dvisualisationtool.app.dataReader.DataReader;
+import sg.edu.nus.comp.android3dvisualisationtool.app.openGLES20Support.GLES20SurfaceView;
 import timber.log.Timber;
 
 import org.ollide.rosandroid.FileManager;
@@ -339,6 +341,7 @@ class CameraCaptureActivityBase extends RosActivity implements SurfaceTexture.On
 */
 public class CameraCaptureActivity extends CameraCaptureActivityBase
         implements OnItemSelectedListener {
+    private GLES20SurfaceView mPCGLView;
     private CameraSurfaceRenderer mRenderer = null;
     private TextView mOutputDirText;
 
@@ -460,6 +463,13 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
         });
+        // Configure the GLSurfaceView for point clouds
+        // https://www.dre.vanderbilt.edu/~schmidt/android/android-4.0/out/target/common/docs/doc-comment-check/resources/articles/glsurfaceview.html
+        mPCGLView = (GLES20SurfaceView) findViewById(R.id.gl_surface_view);
+
+        // set the content for dataReader to read the data file later
+        DataReader.setContext(getApplicationContext());
+
         if (mGpsManager == null) {
             mGpsManager = new GPSManager(this);
         }
@@ -497,6 +507,8 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                 mRenderer.setVideoFrameSize(mVideoFrameWidth, mVideoFrameHeight);
             }
         });
+        if (mPCGLView != null)
+            mPCGLView.onResume();
         mImuManager.register();
         if (nodeMainExecutor != null && livoxNativeNode == null) {
             init(nodeMainExecutor);
@@ -520,6 +532,8 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             }
         });
         mGLView.onPause();
+        if (mPCGLView != null)
+            mPCGLView.onPause();
         mImuManager.unregister();
         stopPathListener();
         stopLivoxRosDriver2();
