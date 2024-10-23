@@ -97,8 +97,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
             Matrix.rotateM(mRotationMatrix, 0, DEFAULT_CAMERA_ANGLE_X, 1, 0, 0);
             Matrix.rotateM(mRotationMatrix, 0, DEFAULT_CAMERA_ANGLE_Y, 0, 1, 0);
 
-            List<Point> lstPoint = CubeBuilder.cubeCorners(8);
-//            List<Point> lstPoint = DataReader.openFile("scan_mid360_asc.pcd");
+            List<Point> lstPoint = CubeBuilder.generateRandomPointsInCube();
             mPoints = new Points(lstPoint, width);
             radius = mPoints.getRadius();
         } else {
