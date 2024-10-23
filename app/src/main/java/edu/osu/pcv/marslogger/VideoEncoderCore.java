@@ -63,16 +63,18 @@ public class VideoEncoderCore {
     class TimePair {
         public Long sensorTimeMicros;
         public long unixTimeNanos;
+        public long upTimeNanos;
         public TimePair(Long sensorTime) {
             sensorTimeMicros = sensorTime;
-            unixTimeNanos = TimeHelper.upTimeToUnixTime(sensorTimeMicros * 1000);
+            unixTimeNanos = TimeHelper.bootTimeToUnixTime(sensorTimeMicros * 1000);
+            upTimeNanos = TimeHelper.bootTimeToUpTime(sensorTimeMicros * 1000);
         }
         public String toString() {
             String delimiter = ",";
             StringBuilder sb = new StringBuilder();
             final long kSecToMicro = 1000000;
             final long kSecToNano = 1000000000;
-            sb.append(String.format("%d.%06d", sensorTimeMicros / kSecToMicro, sensorTimeMicros % kSecToMicro));
+            sb.append(String.format("%d.%09d", upTimeNanos / kSecToNano, upTimeNanos % kSecToNano));
             sb.append(delimiter + String.format("%d.%09d", unixTimeNanos / kSecToNano, unixTimeNanos % kSecToNano));
             return sb.toString();
         }

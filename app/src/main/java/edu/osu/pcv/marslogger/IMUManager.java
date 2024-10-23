@@ -235,12 +235,13 @@ public class IMUManager implements SensorEventListener {
 
     @Override
     public final void onSensorChanged(SensorEvent event) {
-        long unixTimeNanos = TimeHelper.upTimeToUnixTime(event.timestamp);
+        long upTimeNanos = TimeHelper.bootTimeToUpTime(event.timestamp);
+        long unixTimeNanos = TimeHelper.bootTimeToUnixTime(event.timestamp);
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            SensorPacket sp = new SensorPacket(event.timestamp, unixTimeNanos, event.values);
+            SensorPacket sp = new SensorPacket(upTimeNanos, unixTimeNanos, event.values);
             mAccelData.add(sp);
         } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
-            SensorPacket sp = new SensorPacket(event.timestamp, unixTimeNanos, event.values);
+            SensorPacket sp = new SensorPacket(upTimeNanos, unixTimeNanos, event.values);
             mGyroData.add(sp);
             SensorPacket syncedData = syncInertialData();
 
@@ -252,7 +253,7 @@ public class IMUManager implements SensorEventListener {
                 }
             }
         } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            SensorPacket sp = new SensorPacket(event.timestamp, unixTimeNanos, event.values);
+            SensorPacket sp = new SensorPacket(upTimeNanos, unixTimeNanos, event.values);
             mMagData.add(sp);
         }
     }

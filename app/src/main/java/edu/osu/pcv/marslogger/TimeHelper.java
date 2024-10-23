@@ -1,13 +1,22 @@
 package edu.osu.pcv.marslogger;
 
-public class TimeHelper {
-    public static long upTimeToUnixTime(long upTimeNanos) {
-        // Get the current system time in UNIX milliseconds, convert it to nanoseconds
-        long currentTimeNanos = System.currentTimeMillis() * 1000000L;
-        // Get the current system uptime in nanoseconds
-        long systemNanoTime = System.nanoTime();
+import android.os.SystemClock;
 
-        long timeDifferenceNanos = systemNanoTime - upTimeNanos;
-        return currentTimeNanos - timeDifferenceNanos;
+public class TimeHelper {
+    public static long bootTimeToUnixTime(long bootTimeNanos) {
+        // Get the current system time in UNIX milliseconds, convert it to nanoseconds
+        long currentUnixTime = System.currentTimeMillis() * 1000000L;
+        // Get the current system boot time in nanoseconds
+        long currentBootTime = SystemClock.elapsedRealtimeNanos();
+
+        long timeDifference = currentBootTime - bootTimeNanos;
+        return currentUnixTime - timeDifference;
+    }
+
+    public static long bootTimeToUpTime(long bootTimeNanos) {
+        long currentBootTimeNanos = SystemClock.elapsedRealtimeNanos();
+        long currentUpTimeNanos = System.nanoTime();
+        long timeDifference = currentBootTimeNanos - bootTimeNanos;
+        return currentUpTimeNanos - timeDifference;
     }
 }

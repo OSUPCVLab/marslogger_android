@@ -674,8 +674,9 @@ public class Camera2Proxy {
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                        @NonNull CaptureRequest request,
                                        @NonNull TotalCaptureResult result) {
-            Long upTimeNanos = result.get(CaptureResult.SENSOR_TIMESTAMP);
-            long unixTimeNanos = TimeHelper.upTimeToUnixTime(upTimeNanos);
+            Long bootTimeNanos = result.get(CaptureResult.SENSOR_TIMESTAMP);
+            long unixTimeNanos = TimeHelper.bootTimeToUnixTime(bootTimeNanos);
+            long upTimeNanos = TimeHelper.bootTimeToUpTime(bootTimeNanos);
             final long kSecToNano = 1000000000;
             process(result);
 

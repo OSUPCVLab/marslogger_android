@@ -9,6 +9,7 @@
 
 #include <sstream>
 #include <fstream>
+#include <time.h>
 
 using namespace std;
 
@@ -46,8 +47,30 @@ ros::Time upTimeToUnixTime(const ros::Time &upTime) {
     return ros::Time().fromNSec(corrected_unix_time_ns);
 }
 
+// stamp in nanoseconds since the system was booted, including deep sleep time
+// just like SystemClock.elapsedRealtimeNanos() in Java.
+uint64_t getElapsedRealtimeNanos() {
+    struct timespec ts;
+    clock_gettime(CLOCK_BOOTTIME, &ts);
+    return static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL + ts.tv_nsec;
+}
+
+ros::Time upTimeToElapsedRealtime(const ros::Time &upTime) {
+    // Get the current high-resolution uptime in nanoseconds
+    uint64_t current_high_uptime_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    // Get the current system time in nanoseconds (elapsed realtime)
+    uint64_t current_elapsed_time_ns = getElapsedRealtimeNanos();
+
+    uint64_t corrected_elapsed_time_ns = current_elapsed_time_ns - (current_high_uptime_ns - upTime.toNSec());
+    return ros::Time().fromNSec(corrected_elapsed_time_ns);
+}
+
 void pointCloud2Callback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
-    bag.write("/livox/lidar", upTimeToUnixTime(msg->header.stamp), msg);
+    ros::Time uptime = msg->header.stamp;
+    ros::Time unixtime = upTimeToUnixTime(uptime);
+    bag.write("/livox/lidar", unixtime, msg);
     pcmsgCount++;
 }
 
