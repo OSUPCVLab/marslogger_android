@@ -38,7 +38,7 @@ public class Points implements Constants {
     private static float radius;
     private static float scaleFactor;
     private static float curvature;
-    private static float radiusScale = 3.f;
+    private static float radiusScale = 2.f;
 
     // number of coordinates per vertex in this array
     private static final int COORDS_PER_VERTEX = 3;
@@ -70,6 +70,16 @@ public class Points implements Constants {
         vertexCount = lstPoints.size();
         pointsList = lstPoints;
         sc = new ScaleConfiguration(pointsList, DEFAULT_MAX_ABS_COORIDINATE);
+        radius = (float) (sc.getRadius() * displayWidth / DEFAULT_MAX_ABS_COORIDINATE);
+        scaleFactor = (float) sc.getScaleFactor();
+
+        preSetup();
+    }
+
+    public Points(List<Point> lstPoints, int displayWidth, double sc_radius) {
+        vertexCount = lstPoints.size();
+        pointsList = lstPoints;
+        sc = new ScaleConfiguration(pointsList, DEFAULT_MAX_ABS_COORIDINATE, sc_radius);
         radius = (float) (sc.getRadius() * displayWidth / DEFAULT_MAX_ABS_COORIDINATE);
         scaleFactor = (float) sc.getScaleFactor();
 
@@ -334,6 +344,13 @@ public class Points implements Constants {
                 return radius;
         }
         return -1;
+    }
+
+    public double getScaleConfigurationRadius() {
+        if (sc != null)
+            return sc.getRadius();
+        else
+            return -1;
     }
 
     public static void setRadiusScale(float scale) {

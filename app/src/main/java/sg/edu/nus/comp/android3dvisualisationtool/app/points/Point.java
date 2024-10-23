@@ -8,6 +8,7 @@ import sg.edu.nus.comp.android3dvisualisationtool.app.dataReader.DataType;
 public class Point implements Comparable<Point> {
     private float x, y, z, normal_x, normal_y, normal_z;
     private int color = -1;
+    private int seqnum = 0;
     private int[] rgb = null;
     private float[] properties = null;
     private float[] normal = null;
@@ -48,6 +49,15 @@ public class Point implements Comparable<Point> {
         this.type = DataType.XYZC;
     }
 
+    public Point(float x, float y, float z, float curvature, int seq) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.curvature = curvature;
+        this.seqnum = seq;
+        this.type = DataType.XYZC;
+    }
+
     public Point(float x, float y, float z, float curvature, float normal_x,
                  float normal_y, float normal_z) {
         this.x = x;
@@ -80,6 +90,8 @@ public class Point implements Comparable<Point> {
         return this.curvature;
     }
 
+    public int getSeqnum() {  return this.seqnum; }
+
     public int getRGB() {
         return this.color;
     }
@@ -101,6 +113,36 @@ public class Point implements Comparable<Point> {
             normal = new float[]{this.normal_x, this.normal_y, this.normal_z};
         return normal;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Point{")
+                .append("x=").append(x)
+                .append(", y=").append(y)
+                .append(", z=").append(z);
+
+        if (normal_x != 0 || normal_y != 0 || normal_z != 0) {
+            sb.append(", normal=(").append(normal_x).append(", ")
+                    .append(normal_y).append(", ").append(normal_z).append(")");
+        }
+
+        if (color != -1) {
+            sb.append(", color=").append(color);
+        }
+        sb.append(", seq=").append(seqnum);
+
+        if (rgb != null) {
+            sb.append(", rgb=[").append(rgb[0]).append(", ").append(rgb[1]).append(", ").append(rgb[2]).append("]");
+        }
+
+        sb.append(", curvature=").append(curvature);
+        sb.append(", type=").append(type);
+        sb.append('}');
+
+        return sb.toString();
+    }
+
 
     public int[] parseRGB() {
         if (rgb == null && color != -1) {
@@ -162,24 +204,43 @@ public class Point implements Comparable<Point> {
         return properties;
     }
 
+//    @Override
+//    public int compareTo(Point other) {
+//        if (other == null)
+//            return 1;
+//        else if (this.x > other.getX())
+//            return 1;
+//        else if (this.x < other.getX())
+//            return -1;
+//        else if (this.y > other.getY())
+//            return 1;
+//        else if (this.y < other.getY())
+//            return -1;
+//        else if (this.z > other.getZ())
+//            return 1;
+//        else if (this.z < other.getZ())
+//            return -1;
+//        else
+//            return 0;
+//    }
+
     @Override
     public int compareTo(Point other) {
-        if (other == null)
-            return 1;
-        else if (this.x > other.getX())
-            return 1;
-        else if (this.x < other.getX())
-            return -1;
-        else if (this.y > other.getY())
-            return 1;
-        else if (this.y < other.getY())
-            return -1;
-        else if (this.z > other.getZ())
-            return 1;
-        else if (this.z < other.getZ())
-            return -1;
-        else
-            return 0;
+        if (other == null) {
+            throw new NullPointerException("Cannot compare to a null point");
+        }
+
+        int result = Float.compare(this.x, other.getX());
+        if (result != 0) {
+            return result;
+        }
+
+        result = Float.compare(this.y, other.getY());
+        if (result != 0) {
+            return result;
+        }
+
+        return Float.compare(this.z, other.getZ());
     }
 
     public float disTo(Point other) {

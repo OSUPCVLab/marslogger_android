@@ -4,12 +4,13 @@ import android.opengl.GLES20;
 import android.opengl.Matrix;
 import android.util.Log;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.NavigationDrawerFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.axis.Axes;
 import sg.edu.nus.comp.android3dvisualisationtool.app.configuration.Constants;
-import sg.edu.nus.comp.android3dvisualisationtool.app.dataReader.DataReader;
+import sg.edu.nus.comp.android3dvisualisationtool.app.points.CubeBuilder;
 import sg.edu.nus.comp.android3dvisualisationtool.app.points.Point;
 import sg.edu.nus.comp.android3dvisualisationtool.app.points.Points;
 import sg.edu.nus.comp.android3dvisualisationtool.app.util.VirtualSphere;
@@ -42,6 +43,47 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     private float radius = 0;
     private float ratio;
 
+    private List<Point> pointBuffer = new ArrayList<>();
+    private int keep_every_nth = 3;
+    private int keep_max_frames = 20;
+
+    public void appendPoints(List<Point> points) {
+        if (points.isEmpty())
+            return;
+        int maxSeq = points.get(0).getSeqnum();
+        boolean firstFrame = pointBuffer.size() > 0 ? false : true;
+        pointBuffer = filterPoints(pointBuffer, maxSeq);
+        pointBuffer.addAll(points);
+        if (firstFrame)
+            mPoints = new Points(pointBuffer, windowWidth);
+        else
+            mPoints = new Points(pointBuffer, windowWidth, mPoints.getScaleConfigurationRadius());
+        radius = mPoints.getRadius();
+    }
+
+    // Filter points based on seqnum and frame window
+    private List<Point> filterPoints(List<Point> buffer, int maxSeqNum) {
+        List<Point> filteredPoints = new ArrayList<>();
+
+        // Define the minimum and maximum seqnum window we want to keep
+        int minSeqNum = maxSeqNum - (keep_max_frames * keep_every_nth);
+        // Iterate over points and filter them based on the seqnum conditions
+        for (Point point : buffer) {
+            if (Float.isNaN(point.getX()) || Float.isNaN(point.getY()) || Float.isNaN(point.getZ())) {
+                continue;
+            }
+            int seqnum = point.getSeqnum();
+            // Only keep points that:
+            // 1. Have seqnum as a multiple of keep_every_kth
+            // 2. Have seqnum within the [minSeqNum, maxSeqNum] window
+            if (seqnum % keep_every_nth == 0 && seqnum >= minSeqNum && seqnum <= maxSeqNum) {
+                filteredPoints.add(point);
+            }
+        }
+
+        return filteredPoints;
+    }
+
     @Override
     public void onCreate(int width, int height, boolean isContextLost) {
         if (isContextLost) {
@@ -55,7 +97,8 @@ public class GLES20Renderer extends GLRenderer implements Constants {
             Matrix.rotateM(mRotationMatrix, 0, DEFAULT_CAMERA_ANGLE_X, 1, 0, 0);
             Matrix.rotateM(mRotationMatrix, 0, DEFAULT_CAMERA_ANGLE_Y, 0, 1, 0);
 
-            List<Point> lstPoint = DataReader.openFile("scan_mid360_asc.pcd");
+            List<Point> lstPoint = CubeBuilder.cubeCorners(8);
+//            List<Point> lstPoint = DataReader.openFile("scan_mid360_asc.pcd");
             mPoints = new Points(lstPoint, width);
             radius = mPoints.getRadius();
         } else {

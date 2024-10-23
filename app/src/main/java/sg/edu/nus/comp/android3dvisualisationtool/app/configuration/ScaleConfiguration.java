@@ -45,6 +45,17 @@ public class ScaleConfiguration implements Constants {
         this.movedCenterOfMass = centerOfMass;
     }
 
+    public ScaleConfiguration(List<Point> pointsList, double maxAbsCoor, double sc_radius) {
+        this.pointsList = pointsList;
+        Collections.sort(this.pointsList);
+
+        this.maxAbsCoor = maxAbsCoor;
+        this.scaleFactor = calculateScaleFactor();
+        this.radius = sc_radius;
+        this.centerOfMass = calculateCenterOfMass();
+        this.movedCenterOfMass = centerOfMass;
+    }
+
     public double getScaleFactor() {
         return this.scaleFactor;
     }

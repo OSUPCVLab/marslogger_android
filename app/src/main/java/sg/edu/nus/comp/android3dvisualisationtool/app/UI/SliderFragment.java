@@ -37,7 +37,7 @@ public class SliderFragment extends DialogFragment implements Constants {
     private TextView textView_curvature_precision;
     private double value_curvature_precision;
 
-    private static float radiusScale = 3.f;
+    private static float radiusScale = 2.f;
     private static float curvature = 0.5f;
     private static float cameraDistance = (float) DEFAULT_CAMERA_DISTANCE;
     private static float fieldOfView = (float) DEFAULT_FIELD_OF_VIEW;

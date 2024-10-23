@@ -40,8 +40,6 @@ import android.os.Message;
 import androidx.annotation.RequiresApi;
 import androidx.preference.PreferenceManager;
 
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
 import android.util.Pair;
 import android.util.Size;
@@ -52,12 +50,9 @@ import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,6 +62,7 @@ import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 
@@ -75,22 +71,23 @@ import javax.microedition.khronos.opengles.GL10;
 
 import edu.osu.pcv.marslogger.gles.FullFrameRect;
 import edu.osu.pcv.marslogger.gles.Texture2dProgram;
-import sg.edu.nus.comp.android3dvisualisationtool.app.dataReader.DataReader;
+import sensor_msgs.PointCloud2;
 import sg.edu.nus.comp.android3dvisualisationtool.app.openGLES20Support.GLES20SurfaceView;
+import sg.edu.nus.comp.android3dvisualisationtool.app.points.Point;
 import timber.log.Timber;
 
 import org.ollide.rosandroid.FileManager;
 import org.ollide.rosandroid.ImuPublisherNode;
 import org.ollide.rosandroid.LocationPublisherNode;
-import org.ollide.rosandroid.ModuleStatusIndicator;
-import org.ollide.rosandroid.NewsUpdateListener;
-import org.ollide.rosandroid.OnFrameIdChangeListener;
-import org.ollide.rosandroid.PathListenerNode;
+import org.ollide.rosandroid.LocationUpdateListener;
+import org.ollide.rosandroid.FrameNumberListener;
+import org.ollide.rosandroid.PCConverter;
+import org.ollide.rosandroid.WorldPCListener;
+import org.ollide.rosandroid.RosListenerNode;
 import org.ros.address.InetAddressFactory;
 import org.ros.android.IPTool;
 import org.ros.android.RosActivity;
 import org.ros.helpers.ParameterLoaderNode;
-import org.ros.node.ConnectedNode;
 import org.ros.node.DefaultNodeListener;
 import org.ros.node.Node;
 import org.ros.node.NodeConfiguration;
@@ -381,7 +378,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private LivoxRosDriver2NativeNode livoxNativeNode = null;
 
     private LaserLoggerNativeNode laserLoggerNativeNode;
-    private PathListenerNode pathListenerNode = null;
+    private RosListenerNode rosListenerNode = null;
     private ParameterLoaderNode mParameterLoaderNode;
     private int lidarId = 0;
 
@@ -467,9 +464,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         // https://www.dre.vanderbilt.edu/~schmidt/android/android-4.0/out/target/common/docs/doc-comment-check/resources/articles/glsurfaceview.html
         mPCGLView = (GLES20SurfaceView) findViewById(R.id.gl_surface_view);
 
-        // set the content for dataReader to read the data file later
-        DataReader.setContext(getApplicationContext());
-
         if (mGpsManager == null) {
             mGpsManager = new GPSManager(this);
         }
@@ -535,7 +529,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         if (mPCGLView != null)
             mPCGLView.onPause();
         mImuManager.unregister();
-        stopPathListener();
+        stopRosListener();
         stopLivoxRosDriver2();
         super.onPause();
         Timber.d("onPause complete");
@@ -592,13 +586,13 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                     outputDir + File.separator + "movie_metadata.csv");
             startFasterLio(outputDir);
             startLaserLogging(outputDir + File.separator + "mid360.bag");
-            pathListenerNode.setRecording(true);
+            rosListenerNode.setRecording(true);
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
             mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();
-            pathListenerNode.setRecording(false);
+            rosListenerNode.setRecording(false);
             stopLaserLogging();
             stopFasterLio();
         }
@@ -721,7 +715,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         spe.apply();
 
         startLivoxRosDriver2();
-        startPathListener();
+        startRosListener();
     }
 
     /**
@@ -864,18 +858,18 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         livoxNativeNode = null;
     }
 
-    private void startPathListener() {
-        Log.i(TAG, "Starting path listener node...");
+    private void startRosListener() {
+        Log.i(TAG, "Starting ros listener node...");
         NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
 
         nodeConfiguration.setMasterUri(masterUri);
-        nodeConfiguration.setNodeName(PathListenerNode.nodeName);
+        nodeConfiguration.setNodeName(RosListenerNode.nodeName);
 
-        pathListenerNode = new PathListenerNode();
-        pathListenerNode.setOnNewsUpdateListener(
-                new NewsUpdateListener() {
+        rosListenerNode = new RosListenerNode();
+        rosListenerNode.setOnLocationUpdateListener(
+                new LocationUpdateListener() {
                     @Override
-                    public void onNewsUpdate(double x, double y, double z) {
+                    public void onLocationUpdate(double x, double y, double z) {
                         runOnUiThread(
                                 new Runnable() {
                                     @Override
@@ -886,26 +880,36 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                                     }
                                 }
                         );
-                    }
-                    @Override
-                    public void onNumFrameUpdate(int numframes) {
-                        runOnUiThread(
-                                new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        msgCountTextView.setText(String.valueOf(numframes));
-                                    }
-                                }
-                        );
-                    }
-                }
-        );
-        nodeMainExecutor.execute(pathListenerNode, nodeConfiguration);
+                    }});
+        rosListenerNode.setOnFrameNumberListener(new FrameNumberListener() {
+            @Override
+            public void onFrameNumber(int numFrames) {
+                runOnUiThread(
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                msgCountTextView.setText(String.valueOf(numFrames));
+                            }
+                        }
+                );
+            }
+        });
+
+        rosListenerNode.setOnWorldPCListener(new WorldPCListener() {
+            @Override
+            public void onWorldPC(PointCloud2 msg) {
+                List<Point> points = PCConverter.toPointList(msg);
+                mPCGLView.appendPoints(points);
+                mPCGLView.requestRender();
+            }
+        });
+
+        nodeMainExecutor.execute(rosListenerNode, nodeConfiguration);
     }
 
-    private void stopPathListener() {
-        pathListenerNode.shutdown();
-        pathListenerNode = null;
+    private void stopRosListener() {
+        rosListenerNode.shutdown();
+        rosListenerNode = null;
     }
 
     private void startLaserLogging(String bagname) {

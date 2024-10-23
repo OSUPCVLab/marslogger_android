@@ -7,9 +7,12 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 
+import java.util.List;
+
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.NavigationDrawerFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.SliderFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.configuration.Constants;
+import sg.edu.nus.comp.android3dvisualisationtool.app.points.Point;
 import sg.edu.nus.comp.android3dvisualisationtool.app.points.Points;
 
 /**
@@ -38,6 +41,10 @@ public class GLES20SurfaceView extends GLSurfaceView implements Constants {
     public GLES20SurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
         configureRenderer();
+    }
+
+    public void appendPoints(List<Point> points) {
+        mRenderer.appendPoints(points);
     }
 
     private void configureRenderer() {
