@@ -24,7 +24,8 @@ public class MainActivity extends Activity implements Eula.OnEulaAgreedTo {
     private static final String[] REQUIRED_SDK_PERMISSIONS = new String[] {
             Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION};
+            Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN,
+            Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT};
     
     private final static int REQUEST_CODE_ASK_PERMISSIONS = 5947;
     

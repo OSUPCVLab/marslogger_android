@@ -30,7 +30,7 @@ public class LocationPublisherNode extends AbstractNodeMain {
 
     private final LocationListener locationListener;
     private Location cachedLocation;
-    private String navSatFixFrameId;
+    private String navSatFixFrameId = "WGS84";
     private OnFrameIdChangeListener locationFrameIdChangeListener;
 
     public LocationPublisherNode() {

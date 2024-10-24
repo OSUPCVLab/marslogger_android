@@ -18,6 +18,12 @@
         tools:layout="@layout/activity_camera_capture" />
 
     <activity
+        android:id="@+id/navigation_gnss"
+        android:name="edu.osu.pcv.marslogger.WoncanGnssActivity"
+        android:label="@string/title_woncan_gnss"
+        tools:layout="@layout/activity_gnss" />
+
+    <activity
         android:id="@+id/navigation_about"
         android:name="edu.osu.pcv.marslogger.InfoActivity"
         android:label="@string/title_about"

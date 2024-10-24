@@ -1,3 +1,5 @@
 include ':app'
 // here we include the core of ros-android and rosjava
 include ':libraries:rosandroid-core'
+
+include ':libraries:devicelib'

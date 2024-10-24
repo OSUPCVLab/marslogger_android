@@ -15,6 +15,8 @@ gradle.projectsEvaluated {
 }
 
 android {
+    compileSdk 33
+
     // Uncomment these lines To build the release version. These lines are commented for
     // convenience of developers without signing keys, see
     // https://github.com/OSUPCVLab/mobile-ar-sensor-logger/issues/24
@@ -28,7 +30,6 @@ android {
 //            keyPassword properties.getProperty('keyPassword')
 //        }
 //    }
-    compileSdkVersion 31
     defaultConfig {
         applicationId "edu.osu.pcv.marslogger"
         minSdkVersion 23
@@ -57,7 +58,7 @@ android {
         jniLibs.srcDir 'src/main/libs'
         jni.srcDirs = [];
     }
-    
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -81,9 +82,12 @@ dependencies {
     api project(':libraries:rosandroid-core')
     implementation project(':libraries:rosandroid-core')
 
+    implementation project(':libraries:devicelib')
+//    implementation 'com.github.woncan:device:latest.release'
+    implementation 'io.github.cymchad:BaseRecyclerViewAdapterHelper:3.0.14'
+
     implementation 'org.ros.rosjava_core:rosjava_helpers:[0.3, 0.4)'
-    // External libraries
-    implementation 'com.hoho.android:usb-serial-for-android:[0.2, 0.3)'
+
     // Android libraries
     implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation 'com.jakewharton.timber:timber:4.7.1'

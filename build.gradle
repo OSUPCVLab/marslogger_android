@@ -29,6 +29,7 @@ allprojects {
             name "apache-commons-logging"
             url "https://mvnrepository.com/artifact/commons-logging/commons-logging"
         }
+        maven { url "https://jitpack.io" }
     }
 }
 

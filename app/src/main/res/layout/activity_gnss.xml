@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="0dp"
+        android:layout_height="200dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/btn_search"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="16dp"
+        android:text="搜索设备"
+        app:layout_constraintBottom_toBottomOf="@+id/recyclerView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+
+
+    <TextView
+        android:id="@+id/tv_device_info"
+        android:layout_width="0dp"
+        android:padding="16dp"
+        android:layout_height="wrap_content"
+        tools:text="TextView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/recyclerView" />
+
+
+    <TextView
+        android:id="@+id/tv_location"
+        android:layout_width="wrap_content"
+        android:padding="16dp"
+        android:layout_height="wrap_content"
+        tools:text="TextView"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_device_info" />
+
+    <TextView
+        android:id="@+id/tv_log"
+        android:layout_width="0dp"
+        android:padding="16dp"
+        android:scrollbars="vertical"
+        android:gravity="bottom"
+        android:layout_height="200dp"
+        tools:text="TextView"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/btn_cancel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="取消搜索"
+        app:layout_constraintTop_toBottomOf="@+id/btn_search"
+        app:layout_constraintEnd_toEndOf="@+id/btn_search"
+        tools:layout_editor_absoluteY="170dp" />
+
+    <Button
+        android:id="@+id/btn_return"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="16dp"
+        android:text="返回"
+        app:layout_constraintTop_toBottomOf="@+id/btn_cancel"
+        app:layout_constraintEnd_toEndOf="@+id/btn_cancel" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
