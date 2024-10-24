@@ -31,9 +31,9 @@
         android:layout_width="144dp"
         android:layout_height="256dp"
         android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="true"
         android:layout_marginBottom="4dp"
-        android:layout_below="@id/LinearLayoutHeader"
-        >
+        android:layout_below="@id/LinearLayoutHeader" >
 
         <edu.osu.pcv.marslogger.SampleGLView
             android:id="@+id/cameraPreview_surfaceView"
@@ -140,7 +140,7 @@
         android:layout_height="wrap_content"
         android:layout_alignStart="@id/cameraParams_text"
         android:layout_below="@id/numLidarMsgLabel"
-        android:text="Position: " />
+        android:text="Lidar loc: " />
 
     <TextView
         android:id="@+id/currentPositionText"
@@ -151,4 +151,22 @@
         android:layout_toEndOf="@id/currentPositionLabel"
         android:paddingStart="4dp"
         android:text="0.0, 0.0" />
+
+    <TextView
+        android:id="@+id/gnssRtkLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@id/cameraParams_text"
+        android:layout_below="@id/currentPositionLabel"
+        android:text="GNSS-RTK: " />
+
+    <TextView
+        android:id="@+id/gnssRtkText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/gnssRtkLabel"
+        android:layout_alignBottom="@id/gnssRtkLabel"
+        android:layout_toEndOf="@id/gnssRtkLabel"
+        android:paddingStart="4dp"
+        android:text="" />
 </merge>

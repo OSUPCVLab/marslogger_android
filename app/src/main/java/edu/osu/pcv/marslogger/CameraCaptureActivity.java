@@ -16,6 +16,8 @@
 
 package edu.osu.pcv.marslogger;
 
+import static java.lang.Thread.sleep;
+
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
@@ -37,9 +39,11 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.preference.PreferenceManager;
 
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.util.Pair;
 import android.util.Size;
@@ -54,7 +58,24 @@ import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.woncan.device.Device;
+import com.woncan.device.NMEA;
+import com.woncan.device.RTCM;
+import com.woncan.device.RTCMInterval;
+import com.woncan.device.ScanManager;
+import com.woncan.device.bean.DeviceInfo;
+import com.woncan.device.bean.DeviceNtripAccount;
+import com.woncan.device.bean.SatelliteInfo;
+import com.woncan.device.bean.WLocation;
+import com.woncan.device.device.DeviceInterval;
+import com.woncan.device.listener.DeviceStatesListener;
+import com.woncan.device.listener.RTCMListener;
+import com.woncan.device.listener.SatelliteListener;
+import com.woncan.device.listener.WLocationListener;
+
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
@@ -388,6 +409,14 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private TextView lidarIdTextView;
     ///@} // end of ros stuff
 
+    ///@{ // woncan gnss stick
+    private Device mDevice = null;
+    private TextView gnssRtkLog;
+    private ArrayAdapter<Device> gnssAdapter;
+    private BufferedWriter mGnssRtkWriter = null;
+    private boolean mRecordingGnssRtkData = false;
+    ///@} // woncan gnss stick
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -396,13 +425,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         setContentView(R.layout.activity_camera_capture);
         mSnapshotMode = false;
-        Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
-                R.array.cameraFilterNames, android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        // Apply the adapter to the spinner.
-        spinner.setAdapter(adapter);
-        spinner.setOnItemSelectedListener(this);
 
         ///@{ // ros stuff
         masterUriTextView = findViewById(R.id.masterUriText);
@@ -425,7 +447,165 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mOpenedResources.add(new ParameterLoaderNode.Resource(assetInStream, ip.second));
         }
         ///@} // end of ros stuff
+
+        ///@{ woncan gnss rtk
+        gnssRtkLog = (TextView)findViewById(R.id.gnssRtkText);
+        gnssRtkLog.setMovementMethod(ScrollingMovementMethod.getInstance());
+
+        gnssAdapter = new MyDeviceAdapter(this, new ArrayList<>());
+
+        Spinner spinner = (Spinner) findViewById(R.id.cameraFilter_spinner);
+        spinner.setAdapter(gnssAdapter);
+//        spinner.setSelection(gnssAdapter.NO_SELECTION, false);
+        spinner.setOnItemSelectedListener(this);
+        ///@} woncan gnss rtk
     }
+
+    ///@{ woncan gnss rtk
+    // bluetooth device selected
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+        Timber.d("Connecting device: %d", pos);
+        ScanManager.stopScan(this);
+        mDevice = gnssAdapter.getItem(pos);
+        connect(mDevice);
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) {
+    }
+
+    private void connect(Device device) {
+        device.registerSatesListener(new DeviceStatesListener() {
+            @Override
+            public void onConnectionStateChange(boolean isConnect) {
+                gnssRtkLog.append(isConnect ? "设备已连接\n" : "断开连接\n");
+            }
+
+            @Override
+            public void onDeviceAccountChange(@NonNull DeviceNtripAccount account) {
+                super.onDeviceAccountChange(account);
+
+            }
+
+            @Override
+            public void onDeviceInfoChange(@NonNull DeviceInfo deviceInfo) {
+                gnssRtkLog.setText(String.format(Locale.CHINA, "型号：%s\n设备ID：%s\n产品名：%s",
+                        deviceInfo.getModel(), deviceInfo.getDeviceID(), deviceInfo.getProductNameZH()));
+            }
+
+            @Override
+            public void onLaserStateChange(boolean isOpen) {
+
+            }
+        });
+
+        device.registerLocationListener(new WLocationListener() {
+            @Override
+            public void onReceiveLocation(@NonNull WLocation wLocation) {
+                // refer to https://developer.android.com/reference/android/os/SystemClock
+                long unixTimeMillis = wLocation.getTime(); // unix time
+                long bootTimeNanos = wLocation.getElapsedRealtimeNanos(); // Warn: This value may be 0.
+                long upTimeNanos = System.nanoTime();
+                final long kSecToNano = 1000000000L;
+                if (mRecordingGnssRtkData) {
+                    try {
+                        mGnssRtkWriter.write(String.format("%d.%09d %.9f %.9f %.6f %d %d.%03d\n",
+                                upTimeNanos / kSecToNano, upTimeNanos % kSecToNano,
+                                wLocation.getLatitude(), wLocation.getLongitude(),
+                                wLocation.getAltitude(), wLocation.getFixStatus(),
+                                unixTimeMillis / 1000, unixTimeMillis % 1000));
+                    } catch (IOException ioe) {
+                        Timber.e(ioe);
+                    }
+                }
+                gnssRtkLog.setText(String.format(Locale.CHINA,
+                        "纬度：%.8f\n经度：%.8f\ntuo椭球高：%.3f\n解状态：%d",
+                        wLocation.getLatitude(), wLocation.getLongitude(),
+                        wLocation.getAltitude(), wLocation.getFixStatus()));
+            }
+
+            @Override
+            public void onError(int i, @NonNull String s) {
+                gnssRtkLog.append(String.format(Locale.CHINA, "onError:%d  %s\n", i, s));
+            }
+        });
+
+        device.openRTCM(new RTCM[]{RTCM.RTCM1074}, RTCMInterval.SECOND_3);
+        device.registerRTCMAListener(new RTCMListener() {
+            @Override
+            public void onSFRReceiver(byte[] bytes) {
+
+            }
+
+            @Override
+            public void onRTCMReceiver(int[] ints, byte[] bytes) {
+
+            }
+        });
+
+        device.registerSatelliteListener(new SatelliteListener() {
+            @Override
+            public void onReceiveSatellite(List<SatelliteInfo> list) {
+
+            }
+        });
+
+        device.setNMEAEnable(NMEA.GGA , true);
+        device.setNMEAEnable(NMEA.GSV , true);
+        device.setNMEAEnable(NMEA.GSA , true);
+        device.setNMEAEnable(NMEA.GLL , true);
+        device.setNMEAEnable(NMEA.GMC , true);
+        device.setNMEAEnable(NMEA.VTG , true);
+//        device.setNMEAListener(s -> Log.i(TAG, "onReceiveNMEA: "+s));
+        device.setNMEAListener(s -> {});
+
+        device.connect(this);
+        new Thread(() -> {
+            try {
+                sleep(2000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            device.setInterval(DeviceInterval.HZ_5);
+        }).start();
+
+//        device.setAccount("",8001,"","","AUTO");
+//        device.setLaserState(true);
+    }
+    
+    public void startGnssRtkRecording(String captureResultFile) {
+        try {
+            final String GnssRtkHeader = "sensor uptime[sec],lat[deg],lon[deg],ellipsoid height[m],fix status[1],host unix time[sec]\n";
+            mGnssRtkWriter = new BufferedWriter(
+                    new FileWriter(captureResultFile, false));
+            if (mDevice == null) {
+                String warning = "The woncan GNSS RTK device is not connected!\n" +
+                        "No GNSS RTK data will be logged.\n";
+                mGnssRtkWriter.write(warning);
+            } else {
+                mGnssRtkWriter.write(GnssRtkHeader);
+            }
+            mRecordingGnssRtkData = true;
+        } catch (IOException err) {
+            Timber.e(err,"IOException in opening inertial data writer at %s",
+                    captureResultFile);
+        }
+    }
+
+    public void stopGnssRtkRecording() {
+        if (mRecordingGnssRtkData) {
+            mRecordingGnssRtkData = false;
+            try {
+                mGnssRtkWriter.flush();
+                mGnssRtkWriter.close();
+            } catch (IOException err) {
+                Timber.e(err, "IOException in closing GNSS RTK data writer");
+            }
+            mGnssRtkWriter = null;
+        }
+    }
+    ///@} woncan gnss rtk
 
     @Override
     protected void onStart() {
@@ -507,6 +687,15 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         if (nodeMainExecutor != null && livoxNativeNode == null) {
             init(nodeMainExecutor);
         }
+
+        ScanManager.scanDevice(this, device -> {
+            Log.i(TAG, "Found device: " + device.getName());
+            // Check if the device is already in the adapter's list
+            if (gnssAdapter.getPosition(device) == -1) {
+                Log.i(TAG, "Adding device " + device.getName() + " to the adapter");
+                gnssAdapter.add(device);
+            }
+        });
     }
 
     @Override
@@ -531,6 +720,11 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         mImuManager.unregister();
         stopRosListener();
         stopLivoxRosDriver2();
+        if (mDevice != null) {
+            mDevice.closeRTCM();
+            mDevice.disconnect();
+            mDevice = null;
+        }
         super.onPause();
         Timber.d("onPause complete");
     }
@@ -541,26 +735,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         nodeMainExecutor.shutdown();
         mCameraHandler.invalidateHandler();     // paranoia
         super.onDestroy();
-    }
-
-    // spinner selected
-    @Override
-    public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-        Spinner spinner = (Spinner) parent;
-        final int filterNum = spinner.getSelectedItemPosition();
-
-        Timber.d("onItemSelected: %d", filterNum);
-        mGLView.queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                // notify the renderer that we want to change the encoder's state
-                mRenderer.changeFilterMode(filterNum);
-            }
-        });
-    }
-
-    @Override
-    public void onNothingSelected(AdapterView<?> parent) {
     }
 
     /**
@@ -578,10 +752,12 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
             String gpsFile = outputDir + File.separator + "gps.csv";
             String allGpsFile = outputDir + File.separator + "all_gps.csv";
+            String gnssRtkFile = outputDir + File.separator + "woncan_gnss.csv";
             String edgeEpochFile = outputDir + File.separator + "edge_epochs.txt";
             mTimeBaseManager.startRecording(edgeEpochFile, mCamera2Proxy.getmTimeSourceValue());
             mGpsManager.startRecording(gpsFile, allGpsFile);
             mImuManager.startRecording(inertialFile);
+            startGnssRtkRecording(gnssRtkFile);
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
             startFasterLio(outputDir);
@@ -589,6 +765,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             rosListenerNode.setRecording(true);
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
+            stopGnssRtkRecording();
             mImuManager.stopRecording();
             mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();

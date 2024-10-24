@@ -2,6 +2,7 @@ package edu.osu.pcv.marslogger;
 
 import android.app.Activity;
 import android.location.Location;
+import android.os.SystemClock;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -15,8 +16,7 @@ import timber.log.Timber;
  */
 public class GPSManager {
 
-    public static String GpsHeader = "Timestamp[nanosec],lat[deg],lon[deg],alt[deg]," +
-            "Unix time[nanosec]\n";
+    public static String GpsHeader = "uptime[sec],lat[deg],lon[deg],ellipsoid height[m],Unix time[sec]\n";
 
     private final LocationProvider locationProvider;
     private BufferedWriter mLatestLocationWriter = null;
@@ -27,17 +27,17 @@ public class GPSManager {
     public GPSManager(Activity activity) {
         locationProvider = new LocationProvider(activity, location -> {
             if (mRecordingAllGpsData) {
+                long unixTimeMillis = location.getTime();
+                long upTimeMillis = SystemClock.uptimeMillis();
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("%d.%03d %.9f %.9f %.6f %d.%03d",
+                        upTimeMillis / 1000, upTimeMillis % 1000,
+                        location.getLatitude(), location.getLongitude(),
+                        location.getAltitude(), unixTimeMillis / 1000, unixTimeMillis % 1000
+                ));
+
                 try {
-                    Timber.d("writing location %s", location.getLatitude());
-                    Timber.d("writing location %s", location.getLongitude());
-                    Timber.d("writing location %s", location.getAltitude());
-                    mAllLocationsWriter.write(
-                            System.currentTimeMillis() + ","
-                                    + location.getLatitude() + ","
-                                    + location.getLongitude() + ","
-                                    + location.getAltitude() + ","
-                                    + System.currentTimeMillis() + "\n"
-                    );
+                    mAllLocationsWriter.write(sb.toString());
                 } catch (IOException ioe) {
                     Timber.e(ioe);
                 }
@@ -100,20 +100,22 @@ public class GPSManager {
     public boolean recordGpsValue(long syncedDataTimestamp, long unixTime) {
         boolean gpsDataRecorded = false;
         if (mRecordingGpsData) {
-            try {
-                Location currLocation = locationProvider.getCurrLocation();
-                if (currLocation != null) {
-                    mLatestLocationWriter.write(
-                            syncedDataTimestamp + ","
-                                    + currLocation.getLatitude() + ","
-                                    + currLocation.getLongitude() + ","
-                                    + currLocation.getAltitude() + ","
-                                    + unixTime + "\n"
-                    );
+            Location location = locationProvider.getCurrLocation();
+            if (location != null) {
+                long unixTimeMillis = location.getTime();
+                long upTimeMillis = SystemClock.uptimeMillis();
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("%d.%03d %.9f %.9f %.6f %d.%03d",
+                        upTimeMillis / 1000, upTimeMillis % 1000,
+                        location.getLatitude(), location.getLongitude(),
+                        location.getAltitude(), unixTimeMillis / 1000, unixTimeMillis % 1000
+                ));
+                try {
+                    mLatestLocationWriter.write(sb.toString());
                     gpsDataRecorded = true;
+                } catch (IOException ioe) {
+                    Timber.e(ioe);
                 }
-            } catch (IOException ioe) {
-                Timber.e(ioe);
             }
         }
         return gpsDataRecorded;
