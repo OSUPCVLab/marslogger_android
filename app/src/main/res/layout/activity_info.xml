@@ -68,11 +68,11 @@ Each data session in a folder named after the local time at the start of recordi
                 android:textAppearance="?android:attr/textAppearanceMedium" />
 
             <ViewStub
-                android:id="@+id/donations__paypal_stub"
+                android:id="@+id/donations_paypal_stub"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inflatedId="@+id/donations__paypal"
-                android:layout="@layout/donations__fragment_paypal" />
+                android:inflatedId="@+id/donations_paypal"
+                android:layout="@layout/donations_fragment_paypal" />
         </LinearLayout>
     </ScrollView>
 

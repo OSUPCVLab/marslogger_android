@@ -27,7 +27,7 @@
     </LinearLayout>
 
     <Button
-        android:id="@+id/donations__paypal_donate_button"
+        android:id="@+id/donations_paypal_donate_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"

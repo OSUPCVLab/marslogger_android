@@ -44,10 +44,10 @@ public class InfoActivity extends Activity {
 
         /* PayPal */
         if (mPaypalEnabled) {
-            ViewStub paypalViewStub = (ViewStub)findViewById(R.id.donations__paypal_stub);
+            ViewStub paypalViewStub = (ViewStub)findViewById(R.id.donations_paypal_stub);
             paypalViewStub.inflate();
 
-            Button btPayPal = (Button)findViewById(R.id.donations__paypal_donate_button);
+            Button btPayPal = (Button)findViewById(R.id.donations_paypal_donate_button);
             btPayPal.setOnClickListener(new View.OnClickListener() {
 
                 @Override
@@ -81,14 +81,14 @@ public class InfoActivity extends Activity {
         Intent viewIntent = new Intent(Intent.ACTION_VIEW, payPalUri);
         // force intent chooser, do not automatically use PayPal app
         // https://github.com/PrivacyApps/donations/issues/28
-        String title = getResources().getString(R.string.donations__paypal);
+        String title = getResources().getString(R.string.donations_paypal);
         Intent chooser = Intent.createChooser(viewIntent, title);
 
         if (viewIntent.resolveActivity(getPackageManager()) != null) {
             startActivity(chooser);
         } else {
-            openDialog(android.R.drawable.ic_dialog_alert, R.string.donations__alert_dialog_title,
-                    getString(R.string.donations__alert_dialog_no_browser));
+            openDialog(android.R.drawable.ic_dialog_alert, R.string.donations_alert_dialog_title,
+                    getString(R.string.donations_alert_dialog_no_browser));
         }
     }
 
@@ -101,7 +101,7 @@ public class InfoActivity extends Activity {
         dialog.setTitle(title);
         dialog.setMessage(message);
         dialog.setCancelable(true);
-        dialog.setNeutralButton(R.string.donations__button_close,
+        dialog.setNeutralButton(R.string.donations_button_close,
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
