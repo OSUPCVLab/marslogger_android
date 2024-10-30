@@ -75,23 +75,23 @@ ros::Time upTimeToElapsedRealtime(const ros::Time &upTime) {
 }
 
 void pointCloud2Callback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
-    auto t1 = std::chrono::high_resolution_clock::now();
+    // auto t1 = std::chrono::high_resolution_clock::now();
     ros::Time uptime = msg->header.stamp;
     ros::Time unixtime = upTimeToUnixTime(uptime);
     bag.write("/livox/lidar", unixtime, msg);
     pcmsgCount++;
-    auto t2 = std::chrono::high_resolution_clock::now();
-    auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count() * 1000;
-    laser_logger::Timer::addRecord("savePointCloud2", time_used);
+    // auto t2 = std::chrono::high_resolution_clock::now();
+    // auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count() * 1000;
+    // laser_logger::Timer::addRecord("savePointCloud2", time_used);
 }
 
 void imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
-    auto t1 = std::chrono::high_resolution_clock::now();
+    // auto t1 = std::chrono::high_resolution_clock::now();
     bag.write("/livox/imu", upTimeToUnixTime(msg->header.stamp), msg);
     imumsgCount++;
-    auto t2 = std::chrono::high_resolution_clock::now();
-    auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count() * 1000;
-    laser_logger::Timer::addRecord("saveImu", time_used);
+    // auto t2 = std::chrono::high_resolution_clock::now();
+    // auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count() * 1000;
+    // laser_logger::Timer::addRecord("saveImu", time_used);
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
