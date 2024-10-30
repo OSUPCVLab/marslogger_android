@@ -30,8 +30,8 @@ public class Axes implements Constants {
         mLength = length;
         mWidth = width;
 
-        xAxis.draw(mvpMatrix);
-        yAxis.draw(mvpMatrix);
-        zAxis.draw(mvpMatrix);
+//        xAxis.draw(mvpMatrix); // TODO(jhuai): drawing axes often causes the program to crash with glError.
+//        yAxis.draw(mvpMatrix);
+//        zAxis.draw(mvpMatrix);
     }
 }

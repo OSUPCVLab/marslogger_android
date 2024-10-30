@@ -451,6 +451,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         ///@{ woncan gnss rtk
         gnssRtkLog = (TextView)findViewById(R.id.gnssRtkText);
         gnssRtkLog.setMovementMethod(ScrollingMovementMethod.getInstance());
+        gnssRtkLog.setText("");
 
         gnssAdapter = new MyDeviceAdapter(this, new ArrayList<>());
 
@@ -458,6 +459,22 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         spinner.setAdapter(gnssAdapter);
 //        spinner.setSelection(gnssAdapter.NO_SELECTION, false);
         spinner.setOnItemSelectedListener(this);
+        Button scanBLEButton = (Button) findViewById(R.id.scanBluetooth_button);
+        scanBLEButton.setOnClickListener(
+            new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    ScanManager.scanDevice(CameraCaptureActivity.this, device -> {
+                        Log.i(TAG, "Found device: " + device.getName());
+                        // Check if the device is already in the adapter's list
+                        if (gnssAdapter.getPosition(device) == -1) {
+                            Log.i(TAG, "Adding device " + device.getName() + " to the adapter");
+                            gnssAdapter.add(device);
+                        }
+                    });
+                }
+            }
+        );
         ///@} woncan gnss rtk
     }
 
@@ -520,7 +537,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                     }
                 }
                 gnssRtkLog.setText(String.format(Locale.CHINA,
-                        "纬度：%.8f\n经度：%.8f\ntuo椭球高：%.3f\n解状态：%d",
+                        "纬度：%.8f\n经度：%.8f\n椭球高：%.3f\n解状态：%d",
                         wLocation.getLatitude(), wLocation.getLongitude(),
                         wLocation.getAltitude(), wLocation.getFixStatus()));
             }
@@ -687,15 +704,6 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         if (nodeMainExecutor != null && livoxNativeNode == null) {
             init(nodeMainExecutor);
         }
-
-        ScanManager.scanDevice(this, device -> {
-            Log.i(TAG, "Found device: " + device.getName());
-            // Check if the device is already in the adapter's list
-            if (gnssAdapter.getPosition(device) == -1) {
-                Log.i(TAG, "Adding device " + device.getName() + " to the adapter");
-                gnssAdapter.add(device);
-            }
-        });
     }
 
     @Override
@@ -720,6 +728,8 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         mImuManager.unregister();
         stopRosListener();
         stopLivoxRosDriver2();
+        nodeMainExecutor.shutdownNodeMain(mParameterLoaderNode);
+        mParameterLoaderNode = null;
         if (mDevice != null) {
             mDevice.closeRTCM();
             mDevice.disconnect();
@@ -848,7 +858,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         SensorManager sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         try {
             Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-            sensorManager.registerListener(imuPublisherNode.getAccelerometerListener(), accelerometer, SensorManager.SENSOR_DELAY_GAME);
+            sensorManager.registerListener(imuPublisherNode.getAccelerometerListener(), accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
         } catch (NullPointerException e) {
             Log.e(TAG, e.toString());
             return;
@@ -857,7 +867,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         SensorManager sensorManager1 = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         try {
             Sensor gyroscope = sensorManager1.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-            sensorManager1.registerListener(imuPublisherNode.getGyroscopeListener(), gyroscope, SensorManager.SENSOR_DELAY_GAME);
+            sensorManager1.registerListener(imuPublisherNode.getGyroscopeListener(), gyroscope, SensorManager.SENSOR_DELAY_FASTEST);
         } catch (NullPointerException e) {
             Log.e(TAG, e.toString());
             return;
@@ -1007,6 +1017,8 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
     private void stopFasterLio() {
         fasterLioNativeNode.shutdown();
+        nodeMainExecutor.shutdownNodeMain(fasterLioNativeNode);
+        fasterLioNativeNode = null;
     }
 
     private void startLivoxRosDriver2() {
@@ -1032,6 +1044,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
     private void stopLivoxRosDriver2() {
         livoxNativeNode.shutdown();
+        nodeMainExecutor.shutdownNodeMain(livoxNativeNode);
         livoxNativeNode = null;
     }
 
@@ -1086,6 +1099,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
     private void stopRosListener() {
         rosListenerNode.shutdown();
+        nodeMainExecutor.shutdownNodeMain(rosListenerNode);
         rosListenerNode = null;
     }
 
@@ -1103,6 +1117,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
     private void stopLaserLogging() {
         int pcmsgCount = laserLoggerNativeNode.shutdown();
+        nodeMainExecutor.shutdownNodeMain(laserLoggerNativeNode);
         msgCountTextView.setText(String.valueOf(pcmsgCount));
     }
     ///@} // end of ros stuff

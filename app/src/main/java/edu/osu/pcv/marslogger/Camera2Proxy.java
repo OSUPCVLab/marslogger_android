@@ -450,19 +450,19 @@ public class Camera2Proxy {
             exposureNanos = (long) (Float.parseFloat(exposureTimeMsStr) * 1e6f);
             String desiredIsoStr = mSharedPreferences.getString("prefISO", String.valueOf(desiredIso));
             desiredIso = Integer.parseInt(desiredIsoStr);
+
+            // fix exposure
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
+
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.SENSOR_EXPOSURE_TIME, exposureNanos);
+            Timber.d("Exposure time set to %d", exposureNanos);
+
+            // fix ISO
+            mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, desiredIso);
+            Timber.d("ISO set to %d", desiredIso);
         }
-
-        // fix exposure
-        mPreviewRequestBuilder.set(
-                CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
-
-        mPreviewRequestBuilder.set(
-                CaptureRequest.SENSOR_EXPOSURE_TIME, exposureNanos);
-        Timber.d("Exposure time set to %d", exposureNanos);
-
-        // fix ISO
-        mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, desiredIso);
-        Timber.d("ISO set to %d", desiredIso);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.R)
@@ -513,6 +513,8 @@ public class Camera2Proxy {
                         CaptureRequest.LENS_FOCUS_DISTANCE, focalDistance);
                 Timber.d("Focus distance set to %f, note minFocalDist %.5f", focalDistance, minFocalDist);
             }
+
+            setExposureAndIso();
 
             List<Surface> surfaces = new ArrayList<>();
             if (previewForSnapshot) {

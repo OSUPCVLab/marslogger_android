@@ -35,6 +35,14 @@
             android:onClick="clickToggleRecording"
             android:text="@string/toggleRecordingOn"/>
 
+        <Button
+            android:id="@+id/scanBluetooth_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="@dimen/activity_horizontal_margin"
+            android:text="Scan BLE"/>
+
         <Spinner
             android:id="@+id/cameraFilter_spinner"
             android:layout_width="0dp"

@@ -22,6 +22,8 @@ public class GLES20Renderer extends GLRenderer implements Constants {
 
     private static final String TAG = "GLES20Renderer";
     private Points mPoints;
+    private final Object lock = new Object();
+//    private final AtomicReference<Points> mPoints = new AtomicReference<>();
     private VirtualSphere vs = new VirtualSphere();
     private android.graphics.Point cueCenter = new android.graphics.Point();
     private int cueRadius;
@@ -54,10 +56,12 @@ public class GLES20Renderer extends GLRenderer implements Constants {
         boolean firstFrame = pointBuffer.size() > 0 ? false : true;
         pointBuffer = filterPoints(pointBuffer, maxSeq);
         pointBuffer.addAll(points);
-        if (firstFrame)
-            mPoints = new Points(pointBuffer, windowWidth);
-        else
-            mPoints = new Points(pointBuffer, windowWidth, mPoints.getScaleConfigurationRadius());
+        synchronized (lock) {
+            if (firstFrame)
+                mPoints = new Points(pointBuffer, windowWidth);
+            else
+                mPoints = new Points(pointBuffer, windowWidth, mPoints.getScaleConfigurationRadius());
+        }
         radius = mPoints.getRadius();
     }
 
@@ -146,7 +150,9 @@ public class GLES20Renderer extends GLRenderer implements Constants {
         // for the matrix multiplication product to be correct.
         Matrix.multiplyMM(scratch, 0, mMVPMatrix, 0, mRotationMatrix, 0);
 
-        mPoints.draw(scratch, windowWidth);
+        synchronized (lock) {
+            mPoints.draw(scratch, windowWidth);
+        }
 
         if (NavigationDrawerFragment.getShowAxes()) {
             Axes.draw(scratch, (float) (2 * DEFAULT_MAX_ABS_COORIDINATE), (float) (0.1 * (Math.pow(cameraDistance

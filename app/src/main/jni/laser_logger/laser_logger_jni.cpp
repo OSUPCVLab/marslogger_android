@@ -1,4 +1,6 @@
 #include "laser_logger_jni.h"
+#include "utils.h"
+
 #include <android/log.h>
 #include <ros/ros.h>
 #include <rosbag/bag.h>
@@ -9,9 +11,14 @@
 
 #include <sstream>
 #include <fstream>
+#include <map>
 #include <time.h>
 
 using namespace std;
+
+namespace laser_logger {
+    std::map<std::string, Timer::TimerRecord> Timer::records_;
+}
 
 inline void log(const char *msg, ...) {
     va_list args;
@@ -68,15 +75,23 @@ ros::Time upTimeToElapsedRealtime(const ros::Time &upTime) {
 }
 
 void pointCloud2Callback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
+    auto t1 = std::chrono::high_resolution_clock::now();
     ros::Time uptime = msg->header.stamp;
     ros::Time unixtime = upTimeToUnixTime(uptime);
     bag.write("/livox/lidar", unixtime, msg);
     pcmsgCount++;
+    auto t2 = std::chrono::high_resolution_clock::now();
+    auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count() * 1000;
+    laser_logger::Timer::addRecord("savePointCloud2", time_used);
 }
 
 void imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
+    auto t1 = std::chrono::high_resolution_clock::now();
     bag.write("/livox/imu", upTimeToUnixTime(msg->header.stamp), msg);
     imumsgCount++;
+    auto t2 = std::chrono::high_resolution_clock::now();
+    auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count() * 1000;
+    laser_logger::Timer::addRecord("saveImu", time_used);
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -141,6 +156,15 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LaserLoggerN
        loop_rate.sleep();
    }
    bag.close();
+
+   std::string time_log_file;
+   size_t last_slash_pos = bagpath.find_last_of('/');
+   if (last_slash_pos != std::string::npos) {
+       time_log_file = bagpath.substr(0, last_slash_pos) + "/laser_logger_times.txt";
+   } else {
+       time_log_file = "laser_logger_times.txt";
+   }
+   laser_logger::Timer::DumpIntoFile(time_log_file);
    log("Exiting from laser logger JNI call.");
    return 0;
 }
