@@ -24,6 +24,10 @@
 -keep class std_msgs.** { *; }
 -keep class tf2_msgs.** { *; }
 
+# Preserve all classes in the Apache Commons Logging library
+-keep class org.apache.commons.logging.** { *; }
+-dontwarn org.apache.commons.logging.**
+
 -dontwarn org.apache.**
 -dontwarn org.jboss.netty.**
 -dontwarn com.google.common.**
