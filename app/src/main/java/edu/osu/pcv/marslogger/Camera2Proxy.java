@@ -497,22 +497,20 @@ public class Camera2Proxy {
 //                mPreviewRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, mScalarCropRegion);
 //            }
 
-            if (!mTapFocus) {
-                mPreviewRequestBuilder.set(
-                        CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-                float minFocalDist = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
-                Float hyperFocalDistKey = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE);
-                float hyperFocalDist = minFocalDist / 2;
-                if (hyperFocalDistKey != null) {
-                    hyperFocalDist = hyperFocalDistKey; // focus at infinity
-                } else {
-                    Timber.w("Hyper Focal Distance unavailable. Set to %.5f!", hyperFocalDist);
-                }
-                float focalDistance = hyperFocalDist;
-                mPreviewRequestBuilder.set(
-                        CaptureRequest.LENS_FOCUS_DISTANCE, focalDistance);
-                Timber.d("Focus distance set to %f, note minFocalDist %.5f", focalDistance, minFocalDist);
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+            float minFocalDist = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+            Float hyperFocalDistKey = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE);
+            float hyperFocalDist = minFocalDist / 2;
+            if (hyperFocalDistKey != null) {
+                hyperFocalDist = hyperFocalDistKey; // focus at infinity
+            } else {
+                Timber.w("Hyper Focal Distance unavailable. Set to %.5f!", hyperFocalDist);
             }
+            float focalDistance = hyperFocalDist;
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.LENS_FOCUS_DISTANCE, focalDistance);
+            Timber.d("Focus distance set to %f, note minFocalDist %.5f", focalDistance, minFocalDist);
 
             setExposureAndIso();
 

@@ -124,6 +124,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             int cameraSize = manager.getCameraIdList().length;
             CharSequence[] entries = new CharSequence[cameraSize];
             CharSequence[] entriesValues = new CharSequence[cameraSize];
+            String physicalBackCamId = "";
             for (int i = 0; i < cameraSize; i++) {
                 String cameraId = manager.getCameraIdList()[i];
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
@@ -138,6 +139,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
                     if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_BACK) {
                         entries[i] = cameraId + prefix + " Lens Facing Back" + suffix;
+                        physicalBackCamId = cameraId;
                     } else if (characteristics.get(CameraCharacteristics.LENS_FACING) ==
                             CameraMetadata.LENS_FACING_FRONT) {
                         entries[i] = cameraId + prefix + " Lens Facing Front" + suffix;
@@ -154,7 +156,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             // Update our settings entry
             cameraList.setEntries(entries);
             cameraList.setEntryValues(entriesValues);
-            cameraList.setDefaultValue(entriesValues[0]);
+            if (physicalBackCamId.length() == 0)
+                physicalBackCamId = entriesValues[0].toString();
+            cameraList.setDefaultValue(physicalBackCamId);
             // Do not call "cameraList.setValueIndex(0)" which will invoke onSharedPreferenceChanged
             // if the previous camera is not 0, and cause null pointer exception.
 
