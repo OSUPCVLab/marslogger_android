@@ -17,6 +17,8 @@
 
 using namespace livox_ros;
 
+livox_ros::DriverNode *livox_node_ptr = nullptr;
+
 inline void log(const char *msg, ...) {
     va_list args;
     va_start(args, msg);
@@ -29,6 +31,24 @@ inline std::string stdStringFromjString(JNIEnv *env, jstring java_string) {
     std::string out(tmp);
     env->ReleaseStringUTFChars(java_string, tmp);
     return out;
+}
+
+void recordCallback(const std_msgs::String::ConstPtr& msg) {
+    if (msg->data.find("start") == 0) {  // Check if the message starts with "start"
+        ROS_INFO("Start recording...");
+        size_t colon_pos = msg->data.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string fn = msg->data.substr(colon_pos + 1);  // Extract filename after colon
+            livox_node_ptr->StartRecording(fn);
+        } else {
+            ROS_WARN("Invalid command format, missing ':' to separate filename.");
+        }
+    } else if (msg->data == "stop") {
+        ROS_INFO("Stop recording...");
+        livox_node_ptr->StopRecording();
+    } else {
+        ROS_INFO("Unknown command: %s", msg->data.c_str());
+    }
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -137,6 +157,9 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriv
   livox_node.pointclouddata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PointCloudDataPollThread, &livox_node);
   livox_node.imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, &livox_node);
 
+  livox_node_ptr = &livox_node;
+  ros::Subscriber sub = livox_node.subscribe("record_control", 10, recordCallback);
+
   // for debug purposes, we use ros::spinOnce(). Otherwise,ros::spin() without while loop is enough.
   ros::Rate loop_rate(50);
   while (ros::ok()) {
@@ -145,6 +168,7 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriv
   }
 
   log("Exiting from livox ros driver2 JNI call.");
+  livox_node_ptr = nullptr;
   return 0;
 }
 

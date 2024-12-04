@@ -100,6 +100,7 @@ import timber.log.Timber;
 import org.ollide.rosandroid.FileManager;
 import org.ollide.rosandroid.ImuPublisherNode;
 import org.ollide.rosandroid.LocationPublisherNode;
+import org.ollide.rosandroid.RecordSignalNode;
 import org.ollide.rosandroid.LocationUpdateListener;
 import org.ollide.rosandroid.FrameNumberListener;
 import org.ollide.rosandroid.PCConverter;
@@ -399,6 +400,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private LivoxRosDriver2NativeNode livoxNativeNode = null;
 
     private LaserLoggerNativeNode laserLoggerNativeNode;
+    private RecordSignalNode recordSignalNode;
     private RosListenerNode rosListenerNode = null;
     private ParameterLoaderNode mParameterLoaderNode;
     private int lidarId = 0;
@@ -727,6 +729,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mPCGLView.onPause();
         mImuManager.unregister();
         stopRosListener();
+        stopRecordSignalPublisher();
         stopLivoxRosDriver2();
         nodeMainExecutor.shutdownNodeMain(mParameterLoaderNode);
         mParameterLoaderNode = null;
@@ -771,7 +774,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
             startFasterLio(outputDir);
-            startLaserLogging(outputDir + File.separator + "mid360.bag");
+            startLaserLogging2(outputDir + File.separator + "mid360.bag");
             rosListenerNode.setRecording(true);
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
@@ -780,7 +783,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();
             rosListenerNode.setRecording(false);
-            stopLaserLogging();
+            stopLaserLogging2();
             stopFasterLio();
         }
         mGLView.queueEvent(new Runnable() {
@@ -903,6 +906,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
         startLivoxRosDriver2();
         startRosListener();
+        startRecordSignalPublisher();
     }
 
     /**
@@ -1048,6 +1052,19 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         livoxNativeNode = null;
     }
 
+    void startRecordSignalPublisher() {
+        recordSignalNode = new RecordSignalNode();
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(RecordSignalNode.nodeName);
+        nodeMainExecutor.execute(recordSignalNode, nodeConfiguration);
+    }
+
+    void stopRecordSignalPublisher() {
+        nodeMainExecutor.shutdownNodeMain(recordSignalNode);
+        recordSignalNode = null;
+    }
+
     private void startRosListener() {
         Log.i(TAG, "Starting ros listener node...");
         NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
@@ -1119,6 +1136,14 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         int pcmsgCount = laserLoggerNativeNode.shutdown();
         nodeMainExecutor.shutdownNodeMain(laserLoggerNativeNode);
         msgCountTextView.setText(String.valueOf(pcmsgCount));
+    }
+
+    private void startLaserLogging2(String bagname) {
+        recordSignalNode.startRecording(bagname);
+    }
+
+    private void stopLaserLogging2() {
+        recordSignalNode.stopRecording();
     }
     ///@} // end of ros stuff
 }

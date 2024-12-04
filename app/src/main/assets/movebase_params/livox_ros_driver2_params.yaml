@@ -4,7 +4,7 @@ xfer_format: 0  # 0 for PointCloud2, 1 for Livox custom message
 multi_topic: 0
 data_src: 0
 publish_freq: 10.0
-output_data_type: 0
+output_data_type: 3
 rviz_enable: false
 rosbag_enable: false
 output_bag: livox_test.bag
