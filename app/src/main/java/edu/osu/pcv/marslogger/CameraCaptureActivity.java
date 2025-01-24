@@ -18,6 +18,8 @@ package edu.osu.pcv.marslogger;
 
 import static java.lang.Thread.sleep;
 
+import static edu.osu.pcv.marslogger.WoncanUtils.convertStatusToString;
+
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
@@ -471,7 +473,12 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                         // Check if the device is already in the adapter's list
                         if (gnssAdapter.getPosition(device) == -1) {
                             Log.i(TAG, "Adding device " + device.getName() + " to the adapter");
-                            gnssAdapter.add(device);
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    gnssAdapter.add(device);
+                                }
+                            });
                         }
                     });
                 }
@@ -498,7 +505,12 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         device.registerSatesListener(new DeviceStatesListener() {
             @Override
             public void onConnectionStateChange(boolean isConnect) {
-                gnssRtkLog.append(isConnect ? "设备已连接\n" : "断开连接\n");
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        gnssRtkLog.append(isConnect ? "设备已连接\n" : "断开连接\n");
+                    }
+                });
             }
 
             @Override
@@ -509,8 +521,13 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
             @Override
             public void onDeviceInfoChange(@NonNull DeviceInfo deviceInfo) {
-                gnssRtkLog.setText(String.format(Locale.CHINA, "型号：%s\n设备ID：%s\n产品名：%s",
-                        deviceInfo.getModel(), deviceInfo.getDeviceID(), deviceInfo.getProductNameZH()));
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        gnssRtkLog.setText(String.format(Locale.CHINA, "型号：%s\n设备ID：%s\n产品名：%s",
+                                deviceInfo.getModel(), deviceInfo.getDeviceID(), deviceInfo.getProductNameZH()));
+                    }
+                });
             }
 
             @Override
@@ -538,15 +555,25 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
                         Timber.e(ioe);
                     }
                 }
-                gnssRtkLog.setText(String.format(Locale.CHINA,
-                        "纬度：%.8f\n经度：%.8f\n椭球高：%.3f\n解状态：%d",
-                        wLocation.getLatitude(), wLocation.getLongitude(),
-                        wLocation.getAltitude(), wLocation.getFixStatus()));
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        gnssRtkLog.setText(String.format(Locale.CHINA,
+                                "纬度：%.8f\n经度：%.8f\n椭球高：%.3f\n解状态：%s",
+                                wLocation.getLatitude(), wLocation.getLongitude(),
+                                wLocation.getAltitude(), convertStatusToString(wLocation.getFixStatus())));
+                    }
+                });
             }
 
             @Override
             public void onError(int i, @NonNull String s) {
-                gnssRtkLog.append(String.format(Locale.CHINA, "onError:%d  %s\n", i, s));
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        gnssRtkLog.append(String.format(Locale.CHINA, "onError:%d  %s\n", i, s));
+                    }
+                });
             }
         });
 

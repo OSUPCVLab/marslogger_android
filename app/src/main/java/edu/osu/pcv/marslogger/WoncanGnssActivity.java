@@ -2,6 +2,8 @@ package edu.osu.pcv.marslogger;
 
 import static java.lang.Thread.sleep;
 
+import static edu.osu.pcv.marslogger.WoncanUtils.convertStatusToString;
+
 import android.app.Activity;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
@@ -112,7 +114,9 @@ public class WoncanGnssActivity extends Activity {
             @Override
             public void onReceiveLocation(@NonNull WLocation wLocation) {
                 Log.i(TAG, "onReceiveLocation: wLocation");
-                tvLocation.setText(String.format(Locale.CHINA, "纬度：%.8f\n经度：%.8f\n海拔：%.3f\n解状态：%d", wLocation.getLatitude(), wLocation.getLongitude(), wLocation.getAltitude(), wLocation.getFixStatus()));
+                tvLocation.setText(String.format(Locale.CHINA, "纬度：%.8f\n经度：%.8f\n海拔：%.3f\n解状态：%s",
+                        wLocation.getLatitude(), wLocation.getLongitude(), wLocation.getAltitude(),
+                        convertStatusToString(wLocation.getFixStatus())));
             }
 
             @Override
