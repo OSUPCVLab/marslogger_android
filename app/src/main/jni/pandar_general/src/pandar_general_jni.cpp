@@ -87,6 +87,7 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGenera
   }
   std::string server_ip((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 0), NULL));
   std::string lidar_correction_file((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 1), NULL));
+  std::string pandar_time_type((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 2), NULL));
 
   ros::init(argc, &argv[0], node_name.c_str());
 
@@ -101,6 +102,10 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGenera
   std::string lidar_type = "PandarXT-32";
   std::string frame_id = "PandarXT-32";
   std::string timestamp_type = "";
+  if (pandar_time_type != "sensor") {
+    timestamp_type = pandar_time_type;
+  }
+  log("Pandar general jni timestamp type: %s\n", timestamp_type.c_str());
 
   ros::NodeHandle nh("~");
   // Set parameters. this will override values loaded from the YAML file

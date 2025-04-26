@@ -13,15 +13,15 @@
 
     <activity
         android:id="@+id/navigation_video"
-        android:name="edu.osu.pcv.marslogger.LidarCaptureActivity"
+        android:name="edu.osu.pcv.marslogger.CameraCaptureActivity"
         android:label="@string/title_video"
-        tools:layout="@layout/activity_lidar_capture" />
+        tools:layout="@layout/activity_camera_capture" />
 
     <activity
         android:id="@+id/navigation_lidar"
-        android:name="edu.osu.pcv.marslogger.CameraCaptureActivity"
+        android:name="edu.osu.pcv.marslogger.LidarCaptureActivity"
         android:label="@string/title_lidar"
-        tools:layout="@layout/activity_camera_capture" />
+        tools:layout="@layout/activity_lidar_capture" />
 
     <activity
         android:id="@+id/navigation_gnss"

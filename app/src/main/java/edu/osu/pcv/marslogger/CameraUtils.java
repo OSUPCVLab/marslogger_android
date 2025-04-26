@@ -36,7 +36,7 @@ import timber.log.Timber;
  * Camera-related utility functions.
  */
 public class CameraUtils {
-    private static final String TAG = CameraCaptureActivityBase.TAG;
+    private static final String TAG = CameraCapture.TAG;
     private static final float BPP = 0.25f;
 
     /**

@@ -17,7 +17,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".LidarCaptureActivity">
+    tools:context=".CameraCaptureActivity">
 
     <LinearLayout
         android:id="@+id/LinearLayoutHeader"
@@ -35,23 +35,14 @@
             android:onClick="clickToggleRecording"
             android:text="@string/toggleRecordingOn"/>
 
-        <Button
-            android:id="@+id/scanBluetooth_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="@dimen/activity_horizontal_margin"
-            android:text="Scan BLE"/>
-
         <Spinner
             android:id="@+id/cameraFilter_spinner"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="2"
-            android:spinnerMode="dropdown"
             android:layout_marginStart="@dimen/activity_horizontal_margin"/>
     </LinearLayout>
 
-    <include layout="@layout/lidar_preview"/>
+    <include layout="@layout/camera_preview"/>
 
 </RelativeLayout>

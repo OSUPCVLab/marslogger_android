@@ -23,6 +23,6 @@
             android:text="@string/snapshot"/>
     </LinearLayout>
 
-    <include layout="@layout/content_preview"/>
+    <include layout="@layout/camera_preview"/>
 
 </RelativeLayout>

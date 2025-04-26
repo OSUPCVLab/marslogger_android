@@ -1,51 +1,26 @@
 package edu.osu.pcv.marslogger;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.graphics.SurfaceTexture;
-import android.hardware.camera2.CameraMetadata;
 import android.media.Image;
 import android.media.ImageReader;
-import android.opengl.GLSurfaceView;
 import android.os.Bundle;
-import android.os.Environment;
 
-import android.util.Size;
-import android.view.Display;
-import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 
 import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.io.File;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-
 import timber.log.Timber;
 
 
-/**
- * Dependency relations between the key components:
- * CameraSurfaceRenderer onSurfaceCreated depends on mCameraHandler, and eventually mCamera2Proxy
- * mCamera2Proxy initialization depends on onRequestPermissionsResult
- *
- * The order of calls in requesting permission inside onCreate()
- * activity.onCreate() -> requestCameraPermission()
- * activity.onResume()
- * activity.onPause()
- * activity.onRequestPermissionsResult()
- * activity.onResume()
- */
-public class PhotoCaptureActivity extends CameraCaptureActivityBase
+public class PhotoCaptureActivity extends Activity
         implements AdapterView.OnItemSelectedListener {
-    private CameraSurfaceRenderer mRenderer = null;
+    private CameraCapture mCameraCapture;
     private TextView mOutputDirText;
 
     private String mSnapshotOutputDir = null;
@@ -64,37 +39,27 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
         // https://stackoverflow.com/questions/47228194/android-8-1-screen-orientation-issue-flipping-to-landscape-a-portrait-screen
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         setContentView(R.layout.activity_photo_capture);
-        mSnapshotMode = true;
+        mCameraCapture = new CameraCapture(this);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        mCamera2Proxy = new Camera2Proxy(this);
-        Size previewSize = mCamera2Proxy.configureCamera();
-        setLayoutAspectRatio(previewSize);
-        Size videoSize = mCamera2Proxy.getmVideoSize();
-        mVideoFrameWidth = videoSize.getWidth();
-        mVideoFrameHeight = videoSize.getHeight();
+        mCameraCapture.initCamera2Proxy();
 
         // Define a handler that receives camera-control messages from other threads.  All calls
         // to Camera must be made on the same thread.  Note we create this before the renderer
         // thread, so we know the fully-constructed object will be visible.
-        mCameraHandler = new CameraHandler(this, true);
+        mCameraHandler = new CameraHandler(mCameraCapture);
 
         // Configure the GLSurfaceView.  This will start the Renderer thread, with an
         // appropriate EGL context.
-        mGLView = (SampleGLView) findViewById(R.id.cameraPreview_surfaceView);
-        if (mRenderer == null) {
-            mRenderer = new CameraSurfaceRenderer(
-                    mCameraHandler, sVideoEncoder);
-            mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
-            mGLView.setRenderer(mRenderer);
-            mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
-        }
-        mGLView.setTouchListener((event) -> {
+        SampleGLView glView = (SampleGLView) findViewById(R.id.cameraPreview_surfaceView);
+        mCameraCapture.initRenderer(mCameraHandler, glView);
+
+        glView.setTouchListener((event) -> {
             ManualFocusConfig focusConfig =
-                    new ManualFocusConfig(event.getX(), event.getY(), mGLView.getWidth(), mGLView.getHeight());
+                    new ManualFocusConfig(event.getX(), event.getY(), glView.getWidth(), glView.getHeight());
             Timber.d(focusConfig.toString());
             mCameraHandler.sendMessage(
                     mCameraHandler.obtainMessage(CameraHandler.MSG_MANUAL_FOCUS, focusConfig));
@@ -102,8 +67,8 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
         if (mImuManager == null) {
             mImuManager = new IMUManager(this);
         }
-        mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
-        mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
+        mCameraCapture.mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
+        mCameraCapture.mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
         mOutputDirText = (TextView) findViewById(R.id.cameraOutputDir_text);
     }
 
@@ -113,24 +78,9 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
         super.onResume();
         Timber.d("Keeping screen on for previewing recording.");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        mCameraCapture.initCamera2Proxy();
+        mCameraCapture.resume();
 
-        if (mCamera2Proxy == null) {
-            mCamera2Proxy = new Camera2Proxy(this);
-            Size previewSize = mCamera2Proxy.configureCamera();
-            setLayoutAspectRatio(previewSize);
-            Size videoSize = mCamera2Proxy.getmVideoSize();
-            mVideoFrameWidth = videoSize.getWidth();
-            mVideoFrameHeight = videoSize.getHeight();
-        }
-
-        mGLView.onResume();
-        mGLView.queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                mRenderer.setCameraPreviewSize(mCameraPreviewWidth, mCameraPreviewHeight);
-                mRenderer.setVideoFrameSize(mVideoFrameWidth, mVideoFrameHeight);
-            }
-        });
         mImuManager.register();
     }
 
@@ -138,24 +88,12 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
     protected void onPause() {
         Timber.d("onPause -- releasing camera");
         super.onPause();
-        // no more frame metadata will be saved during pause
-        if (mCamera2Proxy != null) {
-            mCamera2Proxy.releaseCamera();
-            mCamera2Proxy = null;
-        }
 
         mSnapshotOutputDir = null;
         mSnap = false;
         mSnapNumber = 0;
 
-        mGLView.queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                // Tell the renderer that it's about to be paused so it can clean up.
-                mRenderer.notifyPausing();
-            }
-        });
-        mGLView.onPause();
+        mCameraCapture.pause();
         mImuManager.unregister();
         Timber.d("onPause complete");
     }
@@ -174,13 +112,7 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
         final int filterNum = spinner.getSelectedItemPosition();
 
         Timber.d("onItemSelected: %d", filterNum);
-        mGLView.queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                // notify the renderer that we want to change the encoder's state
-                mRenderer.changeFilterMode(filterNum);
-            }
-        });
+        mCameraCapture.changeFilter(filterNum);
     }
 
     @Override
@@ -202,7 +134,7 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
                         new ImageSaver(image, dest).run();
                         mSnap = false;
                         ++mSnapNumber;
-                        mCamera2Proxy.pauseRecordingCaptureResult();
+                        mCameraCapture.mCamera2Proxy.pauseRecordingCaptureResult();
                     } else {
                         Image image = ir.acquireLatestImage();
                         image.close();
@@ -212,18 +144,17 @@ public class PhotoCaptureActivity extends CameraCaptureActivityBase
 
     public void clickSnapshot(@SuppressWarnings("unused") View unused) {
         if (mSnapshotOutputDir != null) {
-            mCamera2Proxy.resumeRecordingCaptureResult();
+            mCameraCapture.mCamera2Proxy.resumeRecordingCaptureResult();
             mSnap = true;
         } else {
-            mSnapshotOutputDir = renewOutputDir();
+            mSnapshotOutputDir = mCameraCapture.renewOutputDir();
             String basename = mSnapshotOutputDir.substring(mSnapshotOutputDir.lastIndexOf("/") + 1);
             mOutputDirText.setText(basename);
             mSnapNumber = 0;
-            mCamera2Proxy.startRecordingCaptureResult(
+            mCameraCapture.mCamera2Proxy.startRecordingCaptureResult(
                     mSnapshotOutputDir + File.separator + "movie_metadata.csv");
             mSnap = true;
         }
         Timber.d("Number of snapshots: %d", mSnapNumber + 1);
     }
-
 }

@@ -55,9 +55,10 @@ public class Camera2Proxy {
 
     private static final String TAG = "Camera2Proxy";
 
-    private Activity mActivity;
+    private final CameraCapture mCameraCapture;
+
     private static SharedPreferences mSharedPreferences;
-    private boolean mTapFocus;
+
     private String mCameraIdStr = "";
     private Size mPreviewSize;
     private Size mVideoSize;
@@ -204,12 +205,11 @@ public class Camera2Proxy {
         }
     }
 
-    public Camera2Proxy(Activity activity) {
-        mActivity = activity;
-        mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
-        mTapFocus = mSharedPreferences.getBoolean("switchTapFocus", false);
-        mCameraManager = (CameraManager) mActivity.getSystemService(Context.CAMERA_SERVICE);
-        mOrientationEventListener = new OrientationEventListener(mActivity) {
+    public Camera2Proxy(CameraCapture cameraCapture) {
+        mCameraCapture = cameraCapture;
+        mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mCameraCapture.activity());
+        mCameraManager = (CameraManager) mCameraCapture.activity().getSystemService(Context.CAMERA_SERVICE);
+        mOrientationEventListener = new OrientationEventListener(mCameraCapture.activity()) {
             @Override
             public void onOrientationChanged(int orientation) {
                 mDeviceOrientation = orientation;
@@ -402,7 +402,7 @@ public class Camera2Proxy {
         // the handler will be torn down, The IllegalStateException:
         // sending message to a Handler on a dead thread, will be thrown out.
         mImageReader.setOnImageAvailableListener(
-                ((PhotoCaptureActivity) mActivity).mImageAvailableListener, null);
+                ((PhotoCaptureActivity) mCameraCapture.activity()).mImageAvailableListener, null);
 
         Timber.d("Image reader size w: %d, h: %d",mImageReader.getWidth(),
                 mImageReader.getHeight());
@@ -497,20 +497,23 @@ public class Camera2Proxy {
 //                mPreviewRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, mScalarCropRegion);
 //            }
 
-            mPreviewRequestBuilder.set(
-                    CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+            // The shortest focus distance your camera can achieve (i.e., how close the camera can sharply focus).
             float minFocalDist = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+            // The hyperfocal distance — focusing at this distance means everything from half that distance to infinity will appear sharp.
+            // Unit Diopters (1/meter). If hyperfocalDistance = 0.3f, focus at ~3.33 meters and you get sharpness from ~1.67 meters to infinity.
             Float hyperFocalDistKey = mCameraCharacteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE);
-            float hyperFocalDist = minFocalDist / 2;
+            float hyperFocalDist = 0.3f;
             if (hyperFocalDistKey != null) {
                 hyperFocalDist = hyperFocalDistKey; // focus at infinity
             } else {
-                Timber.w("Hyper Focal Distance unavailable. Set to %.5f!", hyperFocalDist);
+                Timber.w("Hyper Focal Distance unavailable. Set to %.3f!", hyperFocalDist);
             }
-            float focalDistance = hyperFocalDist;
-            mPreviewRequestBuilder.set(
-                    CaptureRequest.LENS_FOCUS_DISTANCE, focalDistance);
-            Timber.d("Focus distance set to %f, note minFocalDist %.5f", focalDistance, minFocalDist);
+            String focusDistanceStr = mSharedPreferences.getString("prefFocusDistance",
+                    String.valueOf(hyperFocalDist));
+            float focalDistance = Float.parseFloat(focusDistanceStr);
+            mPreviewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focalDistance);
+            Timber.d("Focus distance set to %f, note minFocalDist %.5f diopter", focalDistance, minFocalDist);
 
             setExposureAndIso();
 
@@ -724,16 +727,14 @@ public class Camera2Proxy {
                     Timber.e(err, "Error writing captureResult");
                 }
             }
-            ((CameraCaptureActivityBase) mActivity).updateCaptureResultPanel(
-                    sz_focal_length.getWidth(), exposureTimeNs, afMode);
+            mCameraCapture.updateCaptureResultPanel(
+                    sz_focal_length.getWidth(), exposureTimeNs, afMode, fd);
         }
 
     };
 
 
     void changeManualFocusPoint(ManualFocusConfig focusConfig) {
-        if (!mTapFocus)
-            return;
         float eventX = focusConfig.mEventX;
         float eventY = focusConfig.mEventY;
         int viewWidth = focusConfig.mViewWidth;

@@ -94,6 +94,12 @@
             android:defaultValue="157" />
 
         <EditTextPreference
+            android:key="prefPandarTimeType"
+            android:title="Pandar timestamp_type"
+            android:summary="Pandar timestamp_type realtime or (empty) sensor time"
+            android:defaultValue="" />
+
+        <EditTextPreference
             android:key="prefIPNote"
             android:title="Note on IP"
             android:summary="Note about IP settings"

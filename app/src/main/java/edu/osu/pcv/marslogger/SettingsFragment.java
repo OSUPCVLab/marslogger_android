@@ -8,6 +8,7 @@ import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.MediaRecorder;
 import android.net.Uri;
@@ -206,21 +207,16 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 prefExposureTime.setDialogTitle("Adjust exposure time in range " + rangeStr);
             }
 
-            // Get the possible focus lengths, on non-optical devices this only has one value
-            // https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#LENS_INFO_AVAILABLE_FOCAL_LENGTHS
-            float[] focus_lengths = characteristics.get(
-                    CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
-            if (focus_lengths != null && focus_lengths.length > 0) {
-                StringBuilder fociiStrBuilder = new StringBuilder();
-                for (int i = 0; i < focus_lengths.length; i++) {
-                    if (i > 0) {
-                        fociiStrBuilder.append(", ");
-                    }
-                    fociiStrBuilder.append(focus_lengths[i]);
-                }
-                String fociiStr = fociiStrBuilder.toString();
-                prefCameraFocus.setDialogTitle("Adjust focus distances (mm): " + fociiStr);
+            float minFocalDist = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+            Float hyperFocalDistKey = characteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE);
+            float hyperFocalDist = 0.0f;
+            if (hyperFocalDistKey != null) {
+                hyperFocalDist = hyperFocalDistKey; // focus at infinity
+            } else {
+                Timber.w("Hyper Focal Distance unavailable. Set to %.3f!", hyperFocalDist);
             }
+            prefCameraFocus.setDialogTitle("Adjust focus distances, min " +
+                    String.format("%.3f", minFocalDist) + ", hyper " + String.format("%.3f", hyperFocalDist) + " (1/m)");
         } catch (CameraAccessException | NullPointerException e) {
             e.printStackTrace();
         }
