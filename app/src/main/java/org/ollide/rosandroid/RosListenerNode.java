@@ -21,6 +21,7 @@ public class RosListenerNode extends AbstractNodeMain {
     public static final String nodeName = "ros_listener_node";
     private Subscriber<Odometry> odom_subscriber;
     private Subscriber<PointCloud2> livox_pc_subscriber;
+    private Subscriber<PointCloud2> pandar_pc_subscriber;
     private Subscriber<PointCloud2> lio_pc_subscriber;
     private int pc_count = 0;
     private boolean recording = false;
@@ -57,6 +58,7 @@ public class RosListenerNode extends AbstractNodeMain {
 //        final Log log = node.getLog();
         odom_subscriber = node.newSubscriber("/Odometry", "nav_msgs/Odometry");
         livox_pc_subscriber = node.newSubscriber("/livox/lidar", "sensor_msgs/PointCloud2");
+        pandar_pc_subscriber = node.newSubscriber("/pandar", "sensor_msgs/PointCloud2");
         lio_pc_subscriber = node.newSubscriber("/cloud_registered", "sensor_msgs/PointCloud2");
 
         odom_subscriber.addMessageListener(new MessageListener<Odometry>() {
@@ -83,6 +85,20 @@ public class RosListenerNode extends AbstractNodeMain {
            }
         });
 
+        pandar_pc_subscriber.addMessageListener(new MessageListener<PointCloud2>() {
+            @Override
+            public void onNewMessage(PointCloud2 msg) {
+                if (!recording)
+                    return;
+                pc_count++;
+                if (pc_count % 20 == 0) {
+                    for (FrameNumberListener listener : livox_pc_listeners) {
+                        listener.onFrameNumber(pc_count);
+                    }
+                }
+            }
+        });
+
         lio_pc_subscriber.addMessageListener(new MessageListener<PointCloud2>() {
             @Override
             public void onNewMessage(PointCloud2 pointCloud2) {
@@ -96,6 +112,7 @@ public class RosListenerNode extends AbstractNodeMain {
     public void shutdown() {
         odom_subscriber.shutdown();
         livox_pc_subscriber.shutdown();
+        pandar_pc_subscriber.shutdown();
         lio_pc_subscriber.shutdown();
     }
 }

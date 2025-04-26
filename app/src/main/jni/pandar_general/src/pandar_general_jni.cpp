@@ -127,6 +127,7 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGenera
       loop_rate.sleep();
   }
 
+  pandarClientWrap.Stop();
   log("Exiting from pandar general ros node JNI call.");
   hesai_client_ptr = nullptr;
   return 0;
@@ -138,4 +139,3 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGenera
   ros::shutdown();
   return 0;
 }
-

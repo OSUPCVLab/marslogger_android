@@ -251,7 +251,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         pandarTimeType = mSharedPreferences.getString("prefPandarTimeType", "sensor");
         if (pandarTimeType.isEmpty())
             pandarTimeType = "sensor";
-        lidarIdTextView.setText(lidarTypeStr + " " + lidarIdStr + " time_type: " + pandarTimeType);
+        lidarIdTextView.setText(lidarType.toString() + " " + lidarIdStr + " time_type: " + pandarTimeType);
 
         List<Pair<String, String>> resourcesToLoad = new ArrayList<>();
         if (lidarType == LidarType.Mid360) {
