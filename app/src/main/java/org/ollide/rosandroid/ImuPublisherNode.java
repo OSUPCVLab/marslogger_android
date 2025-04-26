@@ -12,9 +12,10 @@ import org.ros.node.topic.Publisher;
 
 import sensor_msgs.Imu;
 import std_msgs.Header;
+import timber.log.Timber;
 
 public class ImuPublisherNode extends AbstractNodeMain {
-    private static float maxFrequency = 100.f;
+    private static float maxFrequency = 200.f;
     private float minElapse = 1000 / maxFrequency;
 
     //TODO Ensure that data from accelerometer, gyroscope, and orientation sensor that is published within the same message does not vary in terms of the time they are message, otherwise drop.
@@ -92,7 +93,6 @@ public class ImuPublisherNode extends AbstractNodeMain {
                     roll = -sensorEvent.values[1];
                     pitch = -sensorEvent.values[2];
                     yaw = 360 - sensorEvent.values[0];
-
                     isOrientationMessagePending = true;
                 }
             }
@@ -121,13 +121,13 @@ public class ImuPublisherNode extends AbstractNodeMain {
 
         connectedNode.executeCancellableLoop(new CancellableLoop() {
             int sequenceNumber = 1;
-            Header header = connectedNode.getTopicMessageFactory().newFromType(Header._TYPE);
-            Imu imuMessage = imuPublisher.newMessage();
-
             @Override
             protected void loop() throws InterruptedException {
                 long currentTimeMillis = System.currentTimeMillis();
-                if (isAccelerometerMessagePending && isGyroscopeMessagePending && isOrientationMessagePending) {
+                if (isAccelerometerMessagePending && isGyroscopeMessagePending) {
+                    Header header = connectedNode.getTopicMessageFactory().newFromType(Header._TYPE);
+                    Imu imuMessage = imuPublisher.newMessage();
+
                     header.setStamp(connectedNode.getCurrentTime());
                     header.setFrameId(imuFrameId);
                     header.setSeq(sequenceNumber);
@@ -140,15 +140,6 @@ public class ImuPublisherNode extends AbstractNodeMain {
                     imuMessage.getAngularVelocity().setX(aRoll);
                     imuMessage.getAngularVelocity().setY(aPitch);
                     imuMessage.getAngularVelocity().setZ(aYaw);
-
-                    prevRoll = roll;
-                    prevPitch = pitch;
-                    prevYaw = yaw;
-
-                    imuMessage.getOrientation().setW(roll);
-                    imuMessage.getOrientation().setX(roll);
-                    imuMessage.getOrientation().setY(pitch);
-                    imuMessage.getOrientation().setZ(yaw);
 
                     imuPublisher.publish(imuMessage);
 

@@ -109,8 +109,8 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 getPreferenceManager().findPreference("prefCamera");
         ListPreference cameraRez = (ListPreference)
                 getPreferenceManager().findPreference("prefSizeRaw");
-//        ListPreference cameraFocus = (ListPreference)
-//                getPreferenceManager().findPreference("prefFocusDistance");
+        EditTextPreference prefCameraFocus = (EditTextPreference)
+                getPreferenceManager().findPreference("prefFocusDistance");
 
         EditTextPreference prefISO = (EditTextPreference)
                 getPreferenceScreen().findPreference("prefISO");
@@ -210,15 +210,17 @@ public class SettingsFragment extends PreferenceFragmentCompat
             // https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#LENS_INFO_AVAILABLE_FOCAL_LENGTHS
             float[] focus_lengths = characteristics.get(
                     CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
-            CharSequence[] focuses = new CharSequence[focus_lengths.length];
-            for (int i = 0; i < focus_lengths.length; i++) {
-                focuses[i] = focus_lengths[i] + "";
+            if (focus_lengths != null && focus_lengths.length > 0) {
+                StringBuilder fociiStrBuilder = new StringBuilder();
+                for (int i = 0; i < focus_lengths.length; i++) {
+                    if (i > 0) {
+                        fociiStrBuilder.append(", ");
+                    }
+                    fociiStrBuilder.append(focus_lengths[i]);
+                }
+                String fociiStr = fociiStrBuilder.toString();
+                prefCameraFocus.setDialogTitle("Adjust focus distances (mm): " + fociiStr);
             }
-
-//            cameraFocus.setEntries(focuses);
-//            cameraFocus.setEntryValues(focuses);
-//            cameraFocus.setValueIndex(0);
-
         } catch (CameraAccessException | NullPointerException e) {
             e.printStackTrace();
         }
@@ -353,18 +355,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 cameraRez.setEntries(rez);
                 cameraRez.setEntryValues(rezValues);
                 cameraRez.setValueIndex(defaultIndex);
-
-                float[] focus_lengths = characteristics.get(
-                        CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
-                CharSequence[] focuses = new CharSequence[focus_lengths.length];
-                for (int i = 0; i < focus_lengths.length; i++) {
-                    focuses[i] = focus_lengths[i] + "";
-                }
-
-//                ListPreference cameraFocus = (ListPreference)getPreferenceManager().findPreference("prefFocusDistance");
-//                cameraFocus.setEntries(focuses);
-//                cameraFocus.setEntryValues(focuses);
-//                cameraFocus.setValueIndex(0);
 
             } catch (CameraAccessException | NullPointerException e) {
                 e.printStackTrace();

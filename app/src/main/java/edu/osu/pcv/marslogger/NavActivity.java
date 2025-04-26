@@ -28,7 +28,7 @@ public class NavActivity extends AppCompatActivity implements
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
         AppBarConfiguration appBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.navigation_imuviewer, R.id.navigation_video, R.id.navigation_gnss, R.id.navigation_about)
+                R.id.navigation_imuviewer, R.id.navigation_video, R.id.navigation_lidar, R.id.navigation_gnss, R.id.navigation_about)
                 .build();
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);

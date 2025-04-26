@@ -11,6 +11,11 @@
         android:title="@string/title_video" />
 
     <item
+        android:id="@+id/navigation_lidar"
+        android:icon="@drawable/ic_lidar_24dp"
+        android:title="@string/title_lidar" />
+
+    <item
         android:id="@+id/navigation_gnss"
         android:icon="@drawable/ic_gnss_24px"
         android:title="@string/title_woncan_gnss" />

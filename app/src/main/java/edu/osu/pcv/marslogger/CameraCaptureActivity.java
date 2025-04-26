@@ -122,6 +122,7 @@ import org.ros.rosjava_tutorial_native_node.FastLioNativeNode;
 import org.ros.rosjava_tutorial_native_node.FasterLioNativeNode;
 import org.ros.rosjava_tutorial_native_node.LivoxRosDriver2NativeNode;
 import org.ros.rosjava_tutorial_native_node.LaserLoggerNativeNode;
+import org.ros.rosjava_tutorial_native_node.PandarGeneralNativeNode;
 
 /**
  * Shows the camera preview on screen while simultaneously recording it to a .mp4 file.
@@ -379,18 +380,8 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         System.loadLibrary("fastlio_jni");
         System.loadLibrary("fasterlio_jni");
         System.loadLibrary("livox_ros_driver2_jni");
+        System.loadLibrary("pandar_general_jni");
     }
-
-    private static ArrayList<Pair<String, String>> mResourcesToLoad = new ArrayList<Pair<String, String>>() {{
-        add(new Pair<String, String>("movebase_params/fastlio2_params.yaml", "/"));
-        // We use the global namespace for fastlio2.
-        add(new Pair<String, String>("movebase_params/fasterlio_mid360.yaml", "/"));
-        // We use the global namespace for fasterlio.
-        add(new Pair<String, String>("movebase_params/livox_ros_driver2_params.yaml", "/"));
-        // We use the global namespace for livox ros driver2.
-        add(new Pair<String, String>("movebase_params/fast_csm_icp_params.yaml", "/"));
-        // We use the global namespace for fast csm icp.
-    }};
 
     private ArrayList<ParameterLoaderNode.Resource> mOpenedResources = new ArrayList<>();
     private NodeMainExecutor nodeMainExecutor = null;
@@ -401,11 +392,62 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
     private FasterLioNativeNode fasterLioNativeNode;
     private LivoxRosDriver2NativeNode livoxNativeNode = null;
 
+    private PandarGeneralNativeNode pandarNativeNode = null;
+
+    public enum LidarType {
+        Mid360(0),
+        PandarXT32(1);
+
+        private final int value;
+
+        LidarType(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+
+        public static LidarType fromValue(int value) {
+            for (LidarType type : LidarType.values()) {
+                if (type.getValue() == value) {
+                    return type;
+                }
+            }
+            throw new IllegalArgumentException("Unknown LidarType value: " + value);
+        }
+
+        public static LidarType parseString(String val) {
+            if (val == null) {
+                Timber.e("Lidar type string is null");
+                return Mid360;
+            }
+            val = val.toLowerCase();
+            if (val.contains("mid360") || val.contains("livox")) {
+                return Mid360;
+            } else if (val.contains("pandar") || val.contains("xt32")) {
+                return PandarXT32;
+            } else {
+                Timber.e("Unknown lidar type: %s", val);
+                return Mid360;
+            }
+        }
+    }
+
     private LaserLoggerNativeNode laserLoggerNativeNode;
     private RecordSignalNode recordSignalNode;
     private RosListenerNode rosListenerNode = null;
     private ParameterLoaderNode mParameterLoaderNode;
-    private int lidarId = 0;
+
+    private LocationPublisherNode locationPublisherNode = null;
+
+    private ImuPublisherNode imuPublisherNode = null;
+    private SensorManager mSensorManager;
+
+    private static SharedPreferences mSharedPreferences;
+
+    private LidarType lidarType;
+    private int lidarId;
 
     private TextView masterUriTextView;
     private TextView msgCountTextView;
@@ -436,12 +478,24 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         positionTextView = findViewById(R.id.currentPositionText);
         lidarIdTextView = findViewById(R.id.lidarIdText);
 
-        lidarId = Integer.parseInt(PreferenceManager.getDefaultSharedPreferences(this).
-                getString("prefLidarId", "0"));
-        lidarIdTextView.setText(String.valueOf(lidarId));
+        mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        String lidarTypeStr = mSharedPreferences.getString("prefLidarType", "mid360");
+        lidarType = LidarType.parseString(lidarTypeStr);
+        String lidarIdStr = mSharedPreferences.getString("prefLidarId", "0");
+        lidarId = Integer.parseInt(lidarIdStr);
+        lidarIdTextView.setText(lidarTypeStr + " " + lidarIdStr);
 
+        List<Pair<String, String>> resourcesToLoad = new ArrayList<>();
+        if (lidarType == LidarType.Mid360) {
+            resourcesToLoad.add(new Pair<>("movebase_params/fasterlio_mid360.yaml", "/"));
+            resourcesToLoad.add(new Pair<>("movebase_params/livox_ros_driver2_params.yaml", "/"));
+            // We use the global namespace for Livox ROS Driver2.
+        } else {
+            resourcesToLoad.add(new Pair<>("movebase_params/fasterlio_pandarxt32.yaml", "/"));
+            resourcesToLoad.add(new Pair<>("movebase_params/pandar_general_ros_params.yaml", PandarGeneralNativeNode.nodeName));
+        }
         // Load raw resources
-        for (Pair<String, String> ip : mResourcesToLoad) {
+        for (Pair<String, String> ip : resourcesToLoad) {
             InputStream assetInStream=null;
             try { // https://stackoverflow.com/questions/1933015/opening-a-file-from-assets-folder-in-android
                 assetInStream=getAssets().open(ip.first);
@@ -730,7 +784,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         if (mPCGLView != null)
             mPCGLView.onResume();
         mImuManager.register();
-        if (nodeMainExecutor != null && livoxNativeNode == null) {
+        if (nodeMainExecutor != null && livoxNativeNode == null && pandarNativeNode == null) {
             init(nodeMainExecutor);
         }
     }
@@ -757,8 +811,15 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         mImuManager.unregister();
         stopRosListener();
         stopRecordSignalPublisher();
-        stopLivoxRosDriver2();
+        if (lidarType == LidarType.Mid360) {
+            stopLivoxRosDriver2();
+        } else {
+            stopPandarRosDriver();
+        }
         nodeMainExecutor.shutdownNodeMain(mParameterLoaderNode);
+        mSensorManager.unregisterListener(imuPublisherNode.getAccelerometerListener());
+        mSensorManager.unregisterListener(imuPublisherNode.getGyroscopeListener());
+        mSensorManager.unregisterListener(imuPublisherNode.getOrientationListener());
         mParameterLoaderNode = null;
         if (mDevice != null) {
             mDevice.closeRTCM();
@@ -801,7 +862,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
             startFasterLio(outputDir);
-            startLaserLogging2(outputDir + File.separator + "mid360.bag");
+            startLaserLogging2(outputDir + File.separator + "lidar.bag");
             rosListenerNode.setRecording(true);
         } else {
             mCamera2Proxy.stopRecordingCaptureResult();
@@ -844,8 +905,8 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
 
         configureParameterServer();
 
-        LocationPublisherNode locationPublisherNode = new LocationPublisherNode();
-        ImuPublisherNode imuPublisherNode = new ImuPublisherNode();
+        locationPublisherNode = new LocationPublisherNode();
+        imuPublisherNode = new ImuPublisherNode();
 
         Criteria criteria = new Criteria();
         criteria.setAccuracy(Criteria.ACCURACY_FINE);
@@ -885,44 +946,40 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             }
         });
 
-        SensorManager sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         try {
-            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-            sensorManager.registerListener(imuPublisherNode.getAccelerometerListener(), accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+            Sensor accelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            mSensorManager.registerListener(imuPublisherNode.getAccelerometerListener(), accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
         } catch (NullPointerException e) {
             Log.e(TAG, e.toString());
             return;
         }
 
-        SensorManager sensorManager1 = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         try {
-            Sensor gyroscope = sensorManager1.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-            sensorManager1.registerListener(imuPublisherNode.getGyroscopeListener(), gyroscope, SensorManager.SENSOR_DELAY_FASTEST);
+            Sensor gyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+            mSensorManager.registerListener(imuPublisherNode.getGyroscopeListener(), gyroscope, SensorManager.SENSOR_DELAY_FASTEST);
         } catch (NullPointerException e) {
             Log.e(TAG, e.toString());
             return;
         }
 
-        SensorManager sensorManager2 = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         try {
-            Sensor orientation = sensorManager2.getDefaultSensor(Sensor.TYPE_ORIENTATION);
-            sensorManager2.registerListener(imuPublisherNode.getOrientationListener(), orientation, SensorManager.SENSOR_DELAY_FASTEST);
+            Sensor orientation = mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
+            mSensorManager.registerListener(imuPublisherNode.getOrientationListener(), orientation, SensorManager.SENSOR_DELAY_FASTEST);
         } catch (NullPointerException e) {
             Log.e(TAG, e.toString());
             return;
         }
 
-        // At this point, the user has already been prompted to either enter the URI
-        // of a master to use or to start a master locally.
-
-        // The user can easily use the selected ROS Hostname in the master chooser
-        // activity.
-
-        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(InetAddressFactory.newNonLoopback().getHostAddress());
-        nodeConfiguration.setMasterUri(getMasterUri());
-
-        nodeMainExecutor.execute(locationPublisherNode, nodeConfiguration);
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(imuPublisherNode.getDefaultNodeName());
         nodeMainExecutor.execute(imuPublisherNode, nodeConfiguration);
+
+        NodeConfiguration nodeConfiguration2 = NodeConfiguration.newPublic(hostName);
+        nodeConfiguration2.setMasterUri(masterUri);
+        nodeConfiguration2.setNodeName(locationPublisherNode.getDefaultNodeName());
+        nodeMainExecutor.execute(locationPublisherNode, nodeConfiguration2);
 
         SharedPreferences sp = getSharedPreferences("SharedPreferences", MODE_PRIVATE);
         SharedPreferences.Editor spe = sp.edit();
@@ -930,8 +987,11 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             spe.putInt("LidarId", lidarId);
         }
         spe.apply();
-
-        startLivoxRosDriver2();
+        if (lidarType == LidarType.Mid360) {
+            startLivoxRosDriver2();
+        } else {
+            startPandarRosDriver();
+        }
         startRosListener();
         startRecordSignalPublisher();
     }
@@ -1077,6 +1137,49 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
         livoxNativeNode.shutdown();
         nodeMainExecutor.shutdownNodeMain(livoxNativeNode);
         livoxNativeNode = null;
+    }
+
+    private void startPandarRosDriver() {
+        Log.i(TAG, "Starting native pandar ros driver node wrapper...");
+        NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
+
+        nodeConfiguration.setMasterUri(masterUri);
+        nodeConfiguration.setNodeName(PandarGeneralNativeNode.nodeName);
+        // The IP address of eth0 of the android phone.
+        String hostip = IPTool.getHostEthernetIp();
+        // the subnet of the IP address of eth0 of the android phone + .1xx
+        // where xx are the last two digits of the mid360 serial number.
+
+        String lidarid = "201"; // String.valueOf(lidarId);
+        String lidarip = IPTool.composeLidarIp(hostip, lidarid);
+        String lidarCorrectionFile = copyLidarCorrectionFile();
+        Log.i(TAG, "host ip:" + hostip + ", lidar ip:" + lidarip + ", correction file:" + lidarCorrectionFile);
+        String[] extraArgs = new String[2];
+        extraArgs[0] = lidarip;
+        extraArgs[1] = lidarCorrectionFile;
+        pandarNativeNode = new PandarGeneralNativeNode(extraArgs);
+        nodeMainExecutor.execute(pandarNativeNode, nodeConfiguration);
+    }
+
+    private void stopPandarRosDriver() {
+        pandarNativeNode.shutdown();
+        nodeMainExecutor.shutdownNodeMain(pandarNativeNode);
+        pandarNativeNode = null;
+    }
+
+    private String copyLidarCorrectionFile() {
+        // Create the sample map in the app data dir
+        String extdir = getExternalFilesDir(
+                Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath() + "/movebase_params";
+        if (!new File(extdir).exists()) {
+            new File(extdir).mkdir();
+        }
+        String correctionFilename = extdir + "/PandarXT-32.csv";
+        File correctionFile = new File(correctionFilename);
+//        if (!correctionFile.exists()) {
+        FileManager.copyAssetFile(getAssets(), "movebase_params/PandarXT-32.csv", correctionFilename);
+//        }
+        return correctionFilename;
     }
 
     void startRecordSignalPublisher() {

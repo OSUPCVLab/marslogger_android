@@ -108,6 +108,20 @@ LOCAL_STATIC_LIBRARIES := roscpp_android_ndk
 include $(BUILD_SHARED_LIBRARY)
 
 
+include $(CLEAR_VARS)
+LOCAL_PATH      :=$(MY_LOCAL_PATH)/pandar_general
+LOCAL_MODULE    := pandar_general_jni
+LOCAL_CFLAGS    := -std=c++11 -pthread -fPIC -fexceptions -frtti # -g -O0 -DDEBUG
+LOCAL_CPPFLAGS  := -isystem -std=c++14
+LOCAL_CPP_FEATURES := exceptions
+LOCAL_SRC_FILES := $(LOCAL_PATH)/src/pandar_general_jni.cpp
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
+LOCAL_LDFLAGS := -Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libgnustl_shared.so
+LOCAL_LDLIBS := -landroid -llog
+LOCAL_STATIC_LIBRARIES := roscpp_android_ndk
+include $(BUILD_SHARED_LIBRARY)
+
+
 # This file should contain the import path for roscpp_android_ndk buildscript.
 # For example:
 # $(call import-add-path, /home/user/ros-android-ndk/roscpp_android/output)
