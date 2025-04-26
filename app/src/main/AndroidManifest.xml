@@ -47,6 +47,10 @@
             android:name=".CameraCaptureActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".LidarCaptureActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:screenOrientation="portrait" />
         <activity android:name=".WoncanGnssActivity"
             android:label="GNSS"
             android:screenOrientation="portrait"

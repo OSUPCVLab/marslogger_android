@@ -108,7 +108,6 @@ import org.ollide.rosandroid.FrameNumberListener;
 import org.ollide.rosandroid.PCConverter;
 import org.ollide.rosandroid.WorldPCListener;
 import org.ollide.rosandroid.RosListenerNode;
-import org.ros.address.InetAddressFactory;
 import org.ros.android.IPTool;
 import org.ros.android.RosActivity;
 import org.ros.helpers.ParameterLoaderNode;
@@ -361,7 +360,7 @@ class CameraCaptureActivityBase extends RosActivity implements SurfaceTexture.On
  * activity.onRequestPermissionsResult()
  * activity.onResume()
 */
-public class CameraCaptureActivity extends CameraCaptureActivityBase
+public class LidarCaptureActivity extends CameraCaptureActivityBase
         implements OnItemSelectedListener {
     private GLES20SurfaceView mPCGLView;
     private CameraSurfaceRenderer mRenderer = null;
@@ -522,7 +521,7 @@ public class CameraCaptureActivity extends CameraCaptureActivityBase
             new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    ScanManager.scanDevice(CameraCaptureActivity.this, device -> {
+                    ScanManager.scanDevice(LidarCaptureActivity.this, device -> {
                         Log.i(TAG, "Found device: " + device.getName());
                         // Check if the device is already in the adapter's list
                         if (gnssAdapter.getPosition(device) == -1) {
@@ -1342,7 +1341,7 @@ class CameraHandler extends Handler {
  * GLSurfaceView#queueEvent() call.
  */
 class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
-    private static final String TAG = CameraCaptureActivity.TAG;
+    private static final String TAG = CameraCaptureActivityBase.TAG;
     private static final boolean VERBOSE = false;
 
     private static final int RECORDING_OFF = 0;
@@ -1399,7 +1398,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
         // We could preserve the old filter mode, but currently not bothering.
         mCurrentFilter = -1;
-        mNewFilter = CameraCaptureActivity.FILTER_NONE;
+        mNewFilter = CameraCaptureActivityBase.FILTER_NONE;
     }
 
     public void resetOutputFiles(String outputFile, String timeFile) {
@@ -1451,37 +1450,37 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
         Timber.d("Updating filter to %d", mNewFilter);
         switch (mNewFilter) {
-            case CameraCaptureActivity.FILTER_NONE:
+            case CameraCaptureActivityBase.FILTER_NONE:
                 programType = Texture2dProgram.ProgramType.TEXTURE_EXT;
                 break;
-            case CameraCaptureActivity.FILTER_BLACK_WHITE:
+            case CameraCaptureActivityBase.FILTER_BLACK_WHITE:
                 // (In a previous version the TEXTURE_EXT_BW variant was enabled by a flag called
                 // ROSE_COLORED_GLASSES, because the shader set the red channel to the B&W color
                 // and green/blue to zero.)
                 programType = Texture2dProgram.ProgramType.TEXTURE_EXT_BW;
                 break;
-            case CameraCaptureActivity.FILTER_BLUR:
+            case CameraCaptureActivityBase.FILTER_BLUR:
                 programType = Texture2dProgram.ProgramType.TEXTURE_EXT_FILT;
                 kernel = new float[]{
                         1f / 16f, 2f / 16f, 1f / 16f,
                         2f / 16f, 4f / 16f, 2f / 16f,
                         1f / 16f, 2f / 16f, 1f / 16f};
                 break;
-            case CameraCaptureActivity.FILTER_SHARPEN:
+            case CameraCaptureActivityBase.FILTER_SHARPEN:
                 programType = Texture2dProgram.ProgramType.TEXTURE_EXT_FILT;
                 kernel = new float[]{
                         0f, -1f, 0f,
                         -1f, 5f, -1f,
                         0f, -1f, 0f};
                 break;
-            case CameraCaptureActivity.FILTER_EDGE_DETECT:
+            case CameraCaptureActivityBase.FILTER_EDGE_DETECT:
                 programType = Texture2dProgram.ProgramType.TEXTURE_EXT_FILT;
                 kernel = new float[]{
                         -1f, -1f, -1f,
                         -1f, 8f, -1f,
                         -1f, -1f, -1f};
                 break;
-            case CameraCaptureActivity.FILTER_EMBOSS:
+            case CameraCaptureActivityBase.FILTER_EMBOSS:
                 programType = Texture2dProgram.ProgramType.TEXTURE_EXT_FILT;
                 kernel = new float[]{
                         2f, 0f, 0f,

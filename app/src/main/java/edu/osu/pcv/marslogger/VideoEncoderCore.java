@@ -42,7 +42,7 @@ import timber.log.Timber;
  * on one thread, and drain the output on a different thread.
  */
 public class VideoEncoderCore {
-    private static final String TAG = CameraCaptureActivity.TAG;
+    private static final String TAG = CameraCaptureActivityBase.TAG;
     private static final boolean VERBOSE = false;
 
     // TODO: these ought to be configurable as well

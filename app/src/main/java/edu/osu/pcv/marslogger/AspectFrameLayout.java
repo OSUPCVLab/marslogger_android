@@ -27,7 +27,7 @@ import timber.log.Timber;
  * Layout that adjusts to maintain a specific aspect ratio.
  */
 public class AspectFrameLayout extends FrameLayout {
-    private static final String TAG = CameraCaptureActivity.TAG + "-AFL";
+    private static final String TAG = CameraCaptureActivityBase.TAG + "-AFL";
 
     private double mTargetAspect = -1.0;        // initially use default window size
 

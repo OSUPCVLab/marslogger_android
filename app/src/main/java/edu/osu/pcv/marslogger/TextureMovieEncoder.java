@@ -59,7 +59,7 @@ import timber.log.Timber;
  * TODO: tweak the API (esp. textureId) so it's less awkward for simple use cases.
  */
 public class TextureMovieEncoder implements Runnable {
-    private static final String TAG = CameraCaptureActivity.TAG;
+    private static final String TAG = CameraCaptureActivityBase.TAG;
     private static final boolean VERBOSE = false;
 
     private static final int MSG_START_RECORDING = 0;
