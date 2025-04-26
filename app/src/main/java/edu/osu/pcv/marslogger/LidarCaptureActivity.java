@@ -468,7 +468,7 @@ public class LidarCaptureActivity extends CameraCaptureActivityBase
         // Occasionally some device show landscape views despite the portrait in manifest. See
         // https://stackoverflow.com/questions/47228194/android-8-1-screen-orientation-issue-flipping-to-landscape-a-portrait-screen
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
-        setContentView(R.layout.activity_camera_capture);
+        setContentView(R.layout.activity_lidar_capture);
         mSnapshotMode = false;
 
         ///@{ // ros stuff
