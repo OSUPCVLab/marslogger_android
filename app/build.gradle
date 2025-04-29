@@ -17,10 +17,12 @@ gradle.projectsEvaluated {
 android {
     compileSdk 33
 
-    // Uncomment these lines To build the release version. These lines are commented for
-    // convenience of developers without signing keys, see
+    // To build the app in release mode,
+    // 1. uncomment these lines in the release block of the signingConfigs
+    // 2. uncomment the line `signingConfig signingConfigs.release`
+    // These lines are commented out for convenience of developers without signing keys, see
     // https://github.com/OSUPCVLab/mobile-ar-sensor-logger/issues/24
-//    signingConfigs {
+    signingConfigs {
 //        release {
 //            Properties properties = new Properties()
 //            properties.load(project.rootProject.file('local.properties').newDataInputStream())
@@ -29,7 +31,7 @@ android {
 //            storePassword properties.getProperty('storePassword')
 //            keyPassword properties.getProperty('keyPassword')
 //        }
-//    }
+    }
     defaultConfig {
         applicationId "edu.osu.pcv.marslogger"
         minSdkVersion 23

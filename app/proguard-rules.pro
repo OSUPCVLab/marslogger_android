@@ -7,32 +7,98 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Add any project specific keep options here:
+# =======================================================================
+#  GENERAL SETTINGS
+# =======================================================================
 
 # obfuscation will break reflection and
 # make these rules much more complex
 -dontobfuscate
 
-# keep all ros classes with names
+# =======================================================================
+#  ROS CORE CLASSES
+# =======================================================================
+
+# Keep all classes in the org.ros packages
 -keep class org.ros.** { *; }
 -keepnames class org.ros.** { *; }
 -dontwarn org.ros.**
 
-# keep ros messages (not part of the org.ros namespace)
+# =======================================================================
+#  ROS MESSAGES AND JAVA MESSAGE CLASSES
+# =======================================================================
+
+# These classes (not part of the org.ros namespace) are dynamically loaded by ROS at runtime.
 -keep class rosgraph_msgs.** { *; }
 -keep class sensor_msgs.** { *; }
 -keep class std_msgs.** { *; }
 -keep class tf2_msgs.** { *; }
 
-# Preserve all classes in the Apache Commons Logging library
+# Keep ROS message definitions
+-keep class org.ros.message.** { *; }
+-keep class org.ros.rosjava_messages.** { *; }
+
+# Keep all classes under common ROS message packages
+-keep class geometry_msgs.** { *; }
+-keep class nav_msgs.** { *; }
+-keep class actionlib_msgs.** { *; }
+-keep class visualization_msgs.** { *; }
+-keep class trajectory_msgs.** { *; }
+
+# =======================================================================
+#  APACHE COMMONS LOGGING
+# =======================================================================
+
+# Preserve all classes in the Apache Commons Logging library.
 -keep class org.apache.commons.logging.** { *; }
+-keep interface org.apache.commons.logging.** { *; }
+-keep class org.apache.commons.logging.impl.** { *; }
+-keep class org.apache.commons.logging.impl.LogFactoryImpl { *; }
+-keep class org.apache.commons.logging.impl.Jdk14Logger { *; }
+-keepclassmembers class org.apache.commons.logging.impl.** { *; }
+-keepnames class org.apache.commons.logging.** { *; }
+-keepclassmembers class org.apache.commons.logging.** { *; }
+-keepattributes *Annotation*
 -dontwarn org.apache.commons.logging.**
 
+# =======================================================================
+#  APACHE COMMONS HTTPCLIENT
+# =======================================================================
+
+# Keep all classes in the Apache Commons HttpClient library.
+-keep class org.apache.commons.httpclient.** { *; }
+-keep interface org.apache.commons.httpclient.** { *; }
+-keep class org.apache.commons.httpclient.cookie.** { *; }
+-keepclassmembers class org.apache.commons.httpclient.** { *; }
+-dontwarn org.apache.commons.httpclient.**
+
+# =======================================================================
+#  APACHE XML-RPC & XML PARSING
+# =======================================================================
+
+# Keep Apache XML-RPC classes
+-keep class org.apache.xmlrpc.** { *; }
+-dontwarn org.apache.xmlrpc.**
+
+# Keep XML parsing classes (SAX, DOM, and javax parsers)
+-keep class javax.xml.parsers.** { *; }
+-keep class org.xml.sax.** { *; }
+-keep class org.w3c.dom.** { *; }
+-dontwarn javax.xml.**
+-dontwarn org.xml.sax.**
+-dontwarn org.w3c.dom.**
+
+# =======================================================================
+#  GENERAL EXCEPTIONS & MISCELLANEOUS
+# =======================================================================
+
+# Keep public static fields - necessary for reflection-based use cases.
+-keepclassmembers class * {
+    public static <fields>;
+}
+
+# Suppress warnings from various other libraries.
 -dontwarn org.apache.**
 -dontwarn org.jboss.netty.**
 -dontwarn com.google.common.**
 -dontwarn org.xbill.**
-
-# https://stackoverflow.com/a/50088271/3167294
--keepattributes *Annotation*
--keep @**annotation** class * {*;}
