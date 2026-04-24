@@ -22,19 +22,10 @@ storePassword=YOURSTOREPASSWORD
 Now you should be able to build and install the release version on your devices.
 
 
-# TODOs
+# Roadmap
 
-* Record multiple cameras.
+- [ ] Use ARCore API to record camera and IMU data as well as visual inertial odometry.
 
-* Correct warnings listed in /mobile-ar-sensor-logger/android-mars-logger/app/build/reports/lint-results.html which is produced by 
-calling "./gradlew check" from the project dir
-
-* Add [git hooks](https://github.com/harliedharma/android-git-hooks) for the Android project. 
-
-* Is it possible to move the camera preview window to the bottom right of the screen?
-
-* Separate scan device and connect device does not prevent the bluetooth pairing stuck issue. But I like this approach.
-Sometimes the connect command stuck in onItemSelected.
-Use listviewwindow instead of the flawed spinner as shown [here](https://stackoverflow.com/questions/27440687/alternative-to-highly-flawed-spinner-class-in-android).
-
+- [ ] On Redmi K60 Pro, the focus distance keeps varying after tap to focus, which is unexpected.
+For Samsung S22+, the focus distance is fixed after tap to focus as expected.
 

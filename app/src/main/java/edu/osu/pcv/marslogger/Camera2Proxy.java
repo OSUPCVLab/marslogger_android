@@ -507,13 +507,14 @@ public class Camera2Proxy {
             if (hyperFocalDistKey != null) {
                 hyperFocalDist = hyperFocalDistKey; // focus at infinity
             } else {
-                Timber.w("Hyper Focal Distance unavailable. Set to %.3f!", hyperFocalDist);
+                Timber.w("Hyper focus distance unavailable. Set to %.3f!", hyperFocalDist);
             }
             String focusDistanceStr = mSharedPreferences.getString("prefFocusDistance",
                     String.valueOf(hyperFocalDist));
             float focalDistance = Float.parseFloat(focusDistanceStr);
             mPreviewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focalDistance);
-            Timber.d("Focus distance set to %f, note minFocalDist %.5f diopter", focalDistance, minFocalDist);
+            Timber.d("Focus distance set to %f, note minFocalDist %.5f diopter, " +
+                    "hyper focal dist %.5f diopter", focalDistance, minFocalDist, hyperFocalDist);
 
             setExposureAndIso();
 
