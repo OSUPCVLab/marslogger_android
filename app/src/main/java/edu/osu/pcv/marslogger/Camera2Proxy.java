@@ -422,6 +422,23 @@ public class Camera2Proxy {
     private ArrayList<NumExpoIso> expoStats = new ArrayList<>(kMaxExpoSamples);
 
     private void setExposureAndIso() {
+        boolean manualControl = mSharedPreferences.getBoolean("switchManualControl", false);
+        if (!manualControl) {
+            // Tap-to-focus must not freeze the exposure selected for the current scene.
+            // Remove any manual sensor values from this reusable builder and let AE keep
+            // adapting after autofocus has completed.
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.SENSOR_EXPOSURE_TIME, null);
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.SENSOR_SENSITIVITY, null);
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
+            mPreviewRequestBuilder.set(
+                    CaptureRequest.CONTROL_AE_LOCK, false);
+            Timber.d("Automatic exposure remains enabled after tap-to-focus");
+            return;
+        }
+
         Long exposureNanos = DesiredCameraSetting.mDesiredExposureTime;
         Long desiredIsoL = 30L * 30000000L / exposureNanos;
         Integer desiredIso = desiredIsoL.intValue();
@@ -440,15 +457,12 @@ public class Camera2Proxy {
             } // else may occur on an emulated device.
         }
 
-        boolean manualControl = mSharedPreferences.getBoolean("switchManualControl", false);
-        if (manualControl) {
-            float exposureTimeMs = (float) exposureNanos / 1e6f;
-            String exposureTimeMsStr = mSharedPreferences.getString(
-                    "prefExposureTime", String.valueOf(exposureTimeMs));
-            exposureNanos = (long) (Float.parseFloat(exposureTimeMsStr) * 1e6f);
-            String desiredIsoStr = mSharedPreferences.getString("prefISO", String.valueOf(desiredIso));
-            desiredIso = Integer.parseInt(desiredIsoStr);
-        }
+        float exposureTimeMs = (float) exposureNanos / 1e6f;
+        String exposureTimeMsStr = mSharedPreferences.getString(
+                "prefExposureTime", String.valueOf(exposureTimeMs));
+        exposureNanos = (long) (Float.parseFloat(exposureTimeMsStr) * 1e6f);
+        String desiredIsoStr = mSharedPreferences.getString("prefISO", String.valueOf(desiredIso));
+        desiredIso = Integer.parseInt(desiredIsoStr);
 
         // fix exposure
         mPreviewRequestBuilder.set(
