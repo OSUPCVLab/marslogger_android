@@ -7,6 +7,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.List;
 
+import edu.osu.pcv.marslogger.benchmark.PipelinePerformanceLogger;
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.NavigationDrawerFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.axis.Axes;
 import sg.edu.nus.comp.android3dvisualisationtool.app.configuration.Constants;
@@ -48,6 +49,11 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     private List<Point> pointBuffer = new ArrayList<>();
     private int keep_every_nth = 3;
     private int keep_max_frames = 20;
+    private volatile PipelinePerformanceLogger performanceLogger;
+
+    public void setPerformanceLogger(PipelinePerformanceLogger logger) {
+        performanceLogger = logger;
+    }
 
     public void appendPoints(List<Point> points) {
         if (points.isEmpty())
@@ -119,6 +125,9 @@ public class GLES20Renderer extends GLRenderer implements Constants {
 
     @Override
     public void onDrawFrame(boolean isFirstDraw) {
+        PipelinePerformanceLogger logger = performanceLogger;
+        PipelinePerformanceLogger.RenderTiming renderTiming =
+                logger == null ? null : logger.onRenderStart();
         float[] scratch = new float[16];
 
         // Draw background color
@@ -157,6 +166,9 @@ public class GLES20Renderer extends GLRenderer implements Constants {
         if (NavigationDrawerFragment.getShowAxes()) {
             Axes.draw(scratch, (float) (2 * DEFAULT_MAX_ABS_COORIDINATE), (float) (0.1 * (Math.pow(cameraDistance
                     / DEFAULT_CAMERA_DISTANCE, 1.0 / 2) * (cameraFieldOfView / DEFAULT_FIELD_OF_VIEW))));
+        }
+        if (logger != null) {
+            logger.onRenderEnd(renderTiming);
         }
     }
 

@@ -10,6 +10,7 @@ import org.ros.node.topic.Subscriber;
 
 import java.util.ArrayList;
 
+import edu.osu.pcv.marslogger.benchmark.PipelinePerformanceLogger;
 import geometry_msgs.Point;
 import nav_msgs.Odometry;
 import nav_msgs.Path;
@@ -25,6 +26,7 @@ public class RosListenerNode extends AbstractNodeMain {
     private Subscriber<PointCloud2> lio_pc_subscriber;
     private int pc_count = 0;
     private boolean recording = false;
+    private volatile PipelinePerformanceLogger performanceLogger;
     ArrayList<LocationUpdateListener> odom_listeners = new ArrayList<LocationUpdateListener>();
     ArrayList<FrameNumberListener> livox_pc_listeners = new ArrayList<FrameNumberListener>();
     ArrayList<WorldPCListener> world_pc_listeners = new ArrayList<WorldPCListener>();
@@ -53,6 +55,20 @@ public class RosListenerNode extends AbstractNodeMain {
         recording = record;
     }
 
+    public void setPerformanceLogger(PipelinePerformanceLogger performanceLogger) {
+        this.performanceLogger = performanceLogger;
+    }
+
+    private void recordRawFrame(PointCloud2 msg) {
+        PipelinePerformanceLogger logger = performanceLogger;
+        if (logger != null && logger.isActive()) {
+            long frameId = ((long) msg.getHeader().getSeq()) & 0xffffffffL;
+            long sensorTimestampNs = msg.getHeader().getStamp().totalNsecs();
+            int pointCount = msg.getHeight() * msg.getWidth();
+            logger.onRawFrameReceived(frameId, sensorTimestampNs, pointCount);
+        }
+    }
+
     @Override
     public void onStart(ConnectedNode node) {
 //        final Log log = node.getLog();
@@ -74,6 +90,7 @@ public class RosListenerNode extends AbstractNodeMain {
         livox_pc_subscriber.addMessageListener(new MessageListener<PointCloud2>() {
            @Override
            public void onNewMessage(PointCloud2 msg) {
+               recordRawFrame(msg);
                if (!recording)
                    return;
                pc_count++;
@@ -88,6 +105,7 @@ public class RosListenerNode extends AbstractNodeMain {
         pandar_pc_subscriber.addMessageListener(new MessageListener<PointCloud2>() {
             @Override
             public void onNewMessage(PointCloud2 msg) {
+                recordRawFrame(msg);
                 if (!recording)
                     return;
                 pc_count++;

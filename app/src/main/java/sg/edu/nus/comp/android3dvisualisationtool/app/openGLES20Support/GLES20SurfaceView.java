@@ -9,6 +9,7 @@ import android.view.ScaleGestureDetector;
 
 import java.util.List;
 
+import edu.osu.pcv.marslogger.benchmark.PipelinePerformanceLogger;
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.NavigationDrawerFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.SliderFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.configuration.Constants;
@@ -45,6 +46,10 @@ public class GLES20SurfaceView extends GLSurfaceView implements Constants {
 
     public void appendPoints(List<Point> points) {
         mRenderer.appendPoints(points);
+    }
+
+    public void setPerformanceLogger(PipelinePerformanceLogger logger) {
+        mRenderer.setPerformanceLogger(logger);
     }
 
     private void configureRenderer() {

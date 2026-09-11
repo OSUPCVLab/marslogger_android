@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import android.os.Bundle;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.preference.PreferenceManager;
 
 import android.util.Log;
 import android.widget.Toast;
@@ -18,6 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import timber.log.Timber;
+import edu.osu.pcv.marslogger.benchmark.BenchmarkSessionManager;
 
 public class MainActivity extends Activity implements Eula.OnEulaAgreedTo {
 
@@ -36,6 +38,11 @@ public class MainActivity extends Activity implements Eula.OnEulaAgreedTo {
 
         if (BuildConfig.DEBUG) {
             Timber.plant(new Timber.DebugTree());
+        }
+
+        if (PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean("prefBenchmarkEnabled", false)) {
+            BenchmarkSessionManager.getInstance(this).start();
         }
 
         Eula.show(this);

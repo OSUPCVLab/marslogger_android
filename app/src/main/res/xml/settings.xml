@@ -113,4 +113,12 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Performance Benchmark">
+        <SwitchPreference
+            android:key="prefBenchmarkEnabled"
+            android:title="Benchmark logging"
+            android:summary="Off. No performance files are written."
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

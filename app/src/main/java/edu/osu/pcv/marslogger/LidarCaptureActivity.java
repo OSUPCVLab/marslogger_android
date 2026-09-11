@@ -105,6 +105,9 @@ import org.ros.rosjava_tutorial_native_node.LivoxRosDriver2NativeNode;
 import org.ros.rosjava_tutorial_native_node.LaserLoggerNativeNode;
 import org.ros.rosjava_tutorial_native_node.PandarGeneralNativeNode;
 
+import edu.osu.pcv.marslogger.benchmark.BenchmarkSessionManager;
+import edu.osu.pcv.marslogger.benchmark.PipelinePerformanceLogger;
+
 /**
  *  RosActivity
  *  └── LidarCaptureActivity
@@ -125,6 +128,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     private IMUManager mImuManager;
     private GPSManager mGpsManager;
     private TimeBaseManager mTimeBaseManager;
+    private BenchmarkSessionManager mBenchmarkSessionManager;
 
     ///@{ // ros stuff
     static {
@@ -235,6 +239,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         // https://stackoverflow.com/questions/47228194/android-8-1-screen-orientation-issue-flipping-to-landscape-a-portrait-screen
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         setContentView(R.layout.activity_lidar_capture);
+        mBenchmarkSessionManager = BenchmarkSessionManager.getInstance(this);
         mCameraCapture = new CameraCapture(this);
 
         ///@{ // ros stuff
@@ -502,6 +507,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         // Configure the GLSurfaceView for point clouds
         // https://www.dre.vanderbilt.edu/~schmidt/android/android-4.0/out/target/common/docs/doc-comment-check/resources/articles/glsurfaceview.html
         mPCGLView = (GLES20SurfaceView) findViewById(R.id.gl_surface_view);
+        mPCGLView.setPerformanceLogger(mBenchmarkSessionManager.getPipelineLogger());
 
         if (mGpsManager == null) {
             mGpsManager = new GPSManager(this);
@@ -931,6 +937,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         nodeConfiguration.setNodeName(RosListenerNode.nodeName);
 
         rosListenerNode = new RosListenerNode();
+        rosListenerNode.setPerformanceLogger(mBenchmarkSessionManager.getPipelineLogger());
         rosListenerNode.setOnLocationUpdateListener(
                 new LocationUpdateListener() {
                     @Override
@@ -963,8 +970,23 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         rosListenerNode.setOnWorldPCListener(new WorldPCListener() {
             @Override
             public void onWorldPC(PointCloud2 msg) {
+                PipelinePerformanceLogger performanceLogger =
+                        mBenchmarkSessionManager.getPipelineLogger();
+                PipelinePerformanceLogger.FrameTiming timing = null;
+                if (performanceLogger.isActive()) {
+                    long frameId = ((long) msg.getHeader().getSeq()) & 0xffffffffL;
+                    long sensorTimestampNs = msg.getHeader().getStamp().totalNsecs();
+                    timing = performanceLogger.onMappingOutputReceived(
+                            frameId, sensorTimestampNs);
+                }
                 List<Point> points = PCConverter.toPointList(msg);
+                if (timing != null) {
+                    performanceLogger.onPreprocessingComplete(timing, points.size());
+                }
                 mPCGLView.appendPoints(points);
+                if (timing != null) {
+                    performanceLogger.onOpenGlHandoff(timing);
+                }
                 mPCGLView.requestRender();
             }
         });
@@ -1005,4 +1027,3 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     }
     ///@} // end of ros stuff
 }
-

@@ -50,6 +50,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import timber.log.Timber;
+import edu.osu.pcv.marslogger.benchmark.BenchmarkSession;
+import edu.osu.pcv.marslogger.benchmark.BenchmarkSessionManager;
 
 /**
  * Activities that contain this fragment must implement the
@@ -105,6 +107,23 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
                 getActivity());
+
+        Preference benchmarkPreference = findPreference("prefBenchmarkEnabled");
+        BenchmarkSessionManager benchmarkManager =
+                BenchmarkSessionManager.getInstance(requireContext());
+        updateBenchmarkSummary(benchmarkPreference, benchmarkManager);
+        benchmarkPreference.setOnPreferenceChangeListener((preference, newValue) -> {
+            if ((Boolean) newValue) {
+                BenchmarkSession session = benchmarkManager.start();
+                Toast.makeText(requireContext(), "Benchmark started: " + session.sessionId,
+                        Toast.LENGTH_SHORT).show();
+            } else {
+                benchmarkManager.stop();
+                Toast.makeText(requireContext(), "Benchmark stopped", Toast.LENGTH_SHORT).show();
+            }
+            updateBenchmarkSummary(preference, benchmarkManager);
+            return true;
+        });
 
         ListPreference cameraList = (ListPreference)
                 getPreferenceManager().findPreference("prefCamera");
@@ -294,6 +313,17 @@ public class SettingsFragment extends PreferenceFragmentCompat
         if (lidarid.length() > 0)
             sharedPreferences.edit().putString("prefLidarId", lidarid).apply();
 
+    }
+
+    private void updateBenchmarkSummary(Preference preference,
+                                        BenchmarkSessionManager manager) {
+        if (preference == null) {
+            return;
+        }
+        BenchmarkSession session = manager.getActiveSession();
+        preference.setSummary(session == null
+                ? "Off. No performance files are written."
+                : "Running session " + session.sessionId);
     }
 
     /**
