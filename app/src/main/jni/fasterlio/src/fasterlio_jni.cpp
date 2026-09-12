@@ -1,7 +1,9 @@
 
 #include <android/log.h>
 
+#include <atomic>
 #include <chrono>
+#include <mutex>
 #include <sstream>
 #include <ros/ros.h>
 #include <std_msgs/String.h>
@@ -13,6 +15,11 @@
 #include "fasterlio_jni.h"
 #include "faster_lio/laser_mapping_wrap.h"
 #include "faster_lio/utils.h"
+
+namespace {
+std::atomic<bool> shutdown_requested{false};
+std::mutex execution_mutex;
+}
 
 inline void log(const char *msg, ...) {
     va_list args;
@@ -56,9 +63,13 @@ inline void check_system_clock() {
   log("high time %ld, system clock time %ld, ros time %ld, diff %d", high_time, current_time, ros_time, diff);
 }
 
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_execute(
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_executeNative(
     JNIEnv *env, jobject obj, jstring rosMasterUri, jstring rosHostname, jstring rosNodeName,
     jobjectArray remappingArguments) {
+  // roscpp is process-global within this JNI library. Do not initialize a new session until
+  // the previous execute call has destroyed every NodeHandle and completed output flushing.
+  std::unique_lock<std::mutex> execution_lock(execution_mutex);
+  faster_lio::Timer::Clear();
   log("Native fasterlio node started.");
   std::string master("__master:=" + stdStringFromjString(env, rosMasterUri));
   std::string hostname("__ip:=" + stdStringFromjString(env, rosHostname));
@@ -90,7 +101,10 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
       argv[argc] = refs[i];
       argc++;
   }
-  std::string output_dir((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 0), NULL));
+  jstring output_dir_arg =
+      static_cast<jstring>(env->GetObjectArrayElement(remappingArguments, 0));
+  std::string output_dir = stdStringFromjString(env, output_dir_arg);
+  env->DeleteLocalRef(output_dir_arg);
   ros::init(argc, &argv[0], unique_node_name.c_str());
   // Release JNI UTF characters
   for (int i = 0; i < len; i++) {
@@ -103,19 +117,25 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
   ros::NodeHandle nh;
   ros::Rate rate(30);
 
+  if (shutdown_requested.load()) {
+      ros::shutdown();
+      log("Faster-LIO stop was requested before initialization completed.");
+      return 0;
+  }
+
   // check_system_clock();
 
   faster_lio::LaserMappingWrap laser_mapping;
   laser_mapping.InitROS(nh);
 
-  bool status = ros::ok();
+  bool status = ros::ok() && !shutdown_requested.load();
   if (!status) {
       log("Error: fasterlio ros::ok() false at start! This means the previous fasterlio has not been cleaned thoroughly!");
   }
   while (status) {
       ros::spinOnce();
       laser_mapping.Run();
-      status = ros::ok();
+      status = ros::ok() && !shutdown_requested.load();
       rate.sleep();
   }
   laser_mapping.Finish(output_dir);
@@ -123,15 +143,24 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNat
   laser_mapping.Savetrajectory(traj_log_file, laser_mapping.I_p_B(), laser_mapping.I_q_B());
   std::string time_log_file = output_dir + "/faster_lio_times.txt";
   faster_lio::Timer::DumpIntoFile(time_log_file);
+  faster_lio::Timer::Clear();
 
   log("Exiting from fasterlio JNI call.");
   return 0;
 }
 
 
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_shutdown
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_shutdownNative
   (JNIEnv *, jobject) {
     log("Shutting down fasterlio native node.");
-    ros::shutdown();
+    shutdown_requested.store(true);
+    if (ros::isStarted()) {
+        ros::shutdown();
+    }
     return 0;
+}
+
+JNIEXPORT void JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_prepareNative
+  (JNIEnv *, jobject) {
+    shutdown_requested.store(false);
 }

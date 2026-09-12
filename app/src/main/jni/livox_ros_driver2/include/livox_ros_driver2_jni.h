@@ -11,18 +11,21 @@ extern "C" {
 #define org_ros_rosjava_tutorial_native_node_LivoxRosDriver2NativeNode_SUCCESS 0L
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_LivoxRosDriver2NativeNode
- * Method:    execute
+ * Method:    executeNative
  * Signature: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_execute
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_executeNative
   (JNIEnv *, jobject, jstring, jstring, jstring, jobjectArray);
 
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_LivoxRosDriver2NativeNode
- * Method:    shutdown
+ * Method:    shutdownNative
  * Signature: ()I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_shutdown
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_shutdownNative
+  (JNIEnv *, jobject);
+
+JNIEXPORT void JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_prepareNative
   (JNIEnv *, jobject);
 
 #ifdef __cplusplus

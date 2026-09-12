@@ -11,18 +11,26 @@ extern "C" {
 #define org_ros_rosjava_tutorial_native_node_FasterLioNativeNode_SUCCESS 0L
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_FasterLioNativeNode
- * Method:    execute
+ * Method:    executeNative
  * Signature: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_execute
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_executeNative
   (JNIEnv *, jobject, jstring, jstring, jstring, jobjectArray);
 
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_FasterLioNativeNode
- * Method:    shutdown
+ * Method:    shutdownNative
  * Signature: ()I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_shutdown
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_shutdownNative
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     org_ros_rosjava_tutorial_native_node_FasterLioNativeNode
+ * Method:    prepareNative
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FasterLioNativeNode_prepareNative
   (JNIEnv *, jobject);
 
 #ifdef __cplusplus

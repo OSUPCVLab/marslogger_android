@@ -16,10 +16,10 @@ public class RecordSignalNode extends AbstractNodeMain {
     private final String topic_name = "record_control";
 
     public static final String nodeName = "record_signal_node";
-    private String bag_name = "";
-    private boolean start_recording = false;
-    private boolean stop_recording = false;
-    private boolean is_recording = false;
+    private volatile String bag_name = "";
+    private volatile boolean start_recording = false;
+    private volatile boolean stop_recording = false;
+    private volatile boolean is_recording = false;
 
     public RecordSignalNode() {
     }
@@ -53,11 +53,13 @@ public class RecordSignalNode extends AbstractNodeMain {
     }
 
     public void startRecording(String bagname) {
-        start_recording = true;
         bag_name = bagname;
+        stop_recording = false;
+        start_recording = true;
     }
 
     public void stopRecording() {
+        start_recording = false;
         stop_recording = true;
     }
 

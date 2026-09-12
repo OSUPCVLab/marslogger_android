@@ -1,6 +1,8 @@
 #include <android/log.h>
 #include <ros/ros.h>
 
+#include <atomic>
+#include <mutex>
 #include "livox_ros_driver2_jni.h"
 #include <iostream>
 #include <chrono>
@@ -17,7 +19,11 @@
 
 using namespace livox_ros;
 
+namespace {
+std::atomic<bool> shutdown_requested{false};
+std::mutex execution_mutex;
 livox_ros::DriverNode *livox_node_ptr = nullptr;
+}
 
 inline void log(const char *msg, ...) {
     va_list args;
@@ -34,6 +40,9 @@ inline std::string stdStringFromjString(JNIEnv *env, jstring java_string) {
 }
 
 void recordCallback(const std_msgs::String::ConstPtr& msg) {
+    if (livox_node_ptr == nullptr) {
+        return;
+    }
     if (msg->data.find("start") == 0) {  // Check if the message starts with "start"
         ROS_INFO("Start recording...");
         size_t colon_pos = msg->data.find(':');
@@ -59,22 +68,23 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_LivoxRosDriver2NativeNode
- * Method:    execute
+ * Method:    executeNative
  * Signature: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_execute(
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_executeNative(
       JNIEnv *env, jobject obj, jstring rosMasterUri, jstring rosHostname, jstring rosNodeName,
       jobjectArray remappingArguments) {
+  std::unique_lock<std::mutex> execution_lock(execution_mutex);
   log("Native livox ros driver2 node started.");
 
   std::string master("__master:=" + stdStringFromjString(env, rosMasterUri));
   std::string hostname("__ip:=" + stdStringFromjString(env, rosHostname));
   std::string node_name(stdStringFromjString(env, rosNodeName));
 
-  log(master.c_str());
-  log(hostname.c_str());
+  log("%s", master.c_str());
+  log("%s", hostname.c_str());
   std::string nnmsg = "livox ros driver2 native nodename " + node_name;
-  log(nnmsg.c_str());
+  log("%s", nnmsg.c_str());
   // Parse remapping arguments
   jsize len = env->GetArrayLength(remappingArguments);
 
@@ -90,22 +100,34 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriv
   //Lookout: ros::init modifies argv, so the references to JVM allocated strings must be kept in some other place to avoid "signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr deadbaad"
   // when trying to free the wrong reference ( see https://github.com/ros/ros_comm/blob/indigo-devel/clients/roscpp/src/libros/init.cpp#L483 )
   char **refs = new char *[len];
+  jstring *java_refs = new jstring[len];
   for (int i = 0; i < len; i++) {
-      refs[i] = (char *) env->GetStringUTFChars(
-              (jstring) env->GetObjectArrayElement(remappingArguments, i), NULL);
+      java_refs[i] = static_cast<jstring>(env->GetObjectArrayElement(remappingArguments, i));
+      refs[i] = (char *) env->GetStringUTFChars(java_refs[i], NULL);
       argv[argc] = refs[i];
       argc++;
   }
-  std::string user_config_path((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 0), NULL));
-  ros::init(argc, &argv[0], node_name.c_str());
+  jstring config_arg = static_cast<jstring>(env->GetObjectArrayElement(remappingArguments, 0));
+  std::string user_config_path = stdStringFromjString(env, config_arg);
+  env->DeleteLocalRef(config_arg);
+  const std::string unique_node_name = node_name + "_" + std::to_string(
+      std::chrono::steady_clock::now().time_since_epoch().count());
+  ros::init(argc, &argv[0], unique_node_name.c_str());
 
   // Release JNI UTF characters
   for (int i = 0; i < len; i++) {
-      env->ReleaseStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, i),
-                                 refs[i]);
+      env->ReleaseStringUTFChars(java_refs[i], refs[i]);
+      env->DeleteLocalRef(java_refs[i]);
   }
+  delete []java_refs;
   delete []refs;
   delete []argv;
+
+  if (shutdown_requested.load()) {
+    ros::shutdown();
+    log("Livox stop was requested before initialization completed.");
+    return 0;
+  }
 
   livox_ros::DriverNode livox_node;
   DRIVER_INFO(livox_node, "Livox Ros Driver2 Version: %s", LIVOX_ROS_DRIVER2_VERSION_STRING);
@@ -162,25 +184,33 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriv
 
   // for debug purposes, we use ros::spinOnce(). Otherwise,ros::spin() without while loop is enough.
   ros::Rate loop_rate(50);
-  while (ros::ok()) {
+  while (ros::ok() && !shutdown_requested.load()) {
       ros::spinOnce();
       loop_rate.sleep();
   }
 
   log("Exiting from livox ros driver2 JNI call.");
+  sub.shutdown();
   livox_node_ptr = nullptr;
   return 0;
 }
 
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_LivoxRosDriver2NativeNode
- * Method:    shutdown
+ * Method:    shutdownNative
  * Signature: ()I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_shutdown
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_shutdownNative
   (JNIEnv *, jobject) {
   log("Shutting down livox ros driver2 native node.");
-  ros::shutdown();
+  shutdown_requested.store(true);
+  if (ros::isStarted()) {
+    ros::shutdown();
+  }
   return 0;
 }
 
+JNIEXPORT void JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_LivoxRosDriver2NativeNode_prepareNative
+  (JNIEnv *, jobject) {
+  shutdown_requested.store(false);
+}

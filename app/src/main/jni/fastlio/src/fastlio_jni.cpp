@@ -1,7 +1,9 @@
 
 #include <android/log.h>
 
+#include <atomic>
 #include <chrono>
+#include <mutex>
 #include <sstream>
 #include <ros/ros.h>
 #include <std_msgs/String.h>
@@ -11,6 +13,11 @@
 #include "fastlio_jni.h"
 #include "fast_lio/fastlio/laserMapping.hpp"
 #include "fast_csm_icp/gsm_wrap.h"
+
+namespace {
+std::atomic<bool> shutdown_requested{false};
+std::mutex execution_mutex;
+}
 
 inline void log(const char *msg, ...) {
     va_list args;
@@ -64,12 +71,15 @@ inline double time_inc_ms(std::chrono::high_resolution_clock::time_point &t_end,
 
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_FastLioNativeNode
- * Method:    execute
+ * Method:    executeNative
  * Signature: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativeNode_execute(
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativeNode_executeNative(
     JNIEnv *env, jobject obj, jstring rosMasterUri, jstring rosHostname, jstring rosNodeName,
     jobjectArray remappingArguments) {
+  // roscpp and FAST-LIO contain process-global state. Serialize sessions until
+  // the previous JNI invocation has destroyed every native object.
+  std::unique_lock<std::mutex> execution_lock(execution_mutex);
   log("Native fastlio node started.");
   std::string master("__master:=" + stdStringFromjString(env, rosMasterUri));
   std::string hostname("__ip:=" + stdStringFromjString(env, rosHostname));
@@ -100,8 +110,12 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
       argv[argc] = refs[i];
       argc++;
   }
-  std::string pcdmap_path((char *) env->GetStringUTFChars((jstring) env->GetObjectArrayElement(remappingArguments, 0), NULL));
-  ros::init(argc, &argv[0], node_name.c_str());
+  jstring pcdmap_arg = static_cast<jstring>(env->GetObjectArrayElement(remappingArguments, 0));
+  std::string pcdmap_path = stdStringFromjString(env, pcdmap_arg);
+  env->DeleteLocalRef(pcdmap_arg);
+  const std::string unique_node_name = node_name + "_" + std::to_string(
+      std::chrono::steady_clock::now().time_since_epoch().count());
+  ros::init(argc, &argv[0], unique_node_name.c_str());
 
   // Release JNI UTF characters
   for (int i = 0; i < len; i++) {
@@ -113,6 +127,11 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
 
   ros::NodeHandle nh;
   ros::Rate rate(30);
+  if (shutdown_requested.load()) {
+      ros::shutdown();
+      log("FAST-LIO stop was requested before initialization completed.");
+      return 0;
+  }
   // comment out global localization for it's so slow.
   auto              match_begin_csm       = std::chrono::high_resolution_clock::now();
   int accum_frames = 2;
@@ -125,7 +144,7 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
   std::string pcdbasename = "map_0.1.pcd";
   if (locmode) {
     gsm->LoadMap(fn_path, pcdbasename);
-    while (ros::ok()) {
+    while (ros::ok() && !shutdown_requested.load()) {
         if (gsm->loc_status()) {
           map_T_lidar = gsm->init_pose();
           log("Global scan matcher returned initial position %f %f %f", map_T_lidar.pose.position.x, map_T_lidar.pose.position.y, map_T_lidar.pose.position.z);
@@ -144,6 +163,10 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
     map_T_lidar.pose.orientation.w = 1;
   }
   gsm.reset(); // remove the gsm node.
+  if (!ros::ok() || shutdown_requested.load()) {
+    log("FAST-LIO stopped while waiting for global localization.");
+    return 0;
+  }
   auto   match_end_csm = std::chrono::high_resolution_clock::now();
   double delta_ms = time_inc_ms(match_end_csm, match_begin_csm);
   log("Global scan matcher took %f ms", delta_ms);
@@ -156,7 +179,7 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
   fastlio::LaserMapping node(nh);
   global_pose_publisher = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/amcl_pose", 2, true);
   ros::Subscriber sub_lidar_odom = nh.subscribe("/Odometry", 1, &laserOdometryCallback);
-  bool status = ros::ok();
+  bool status = ros::ok() && !shutdown_requested.load();
   tf::TransformBroadcaster tf_broadcaster;
   while (status) {
       ros::spinOnce();
@@ -171,10 +194,12 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
       tf::StampedTransform map_T_odom_stamped(map_T_odom, ros::Time::now() + ros::Duration(0.5), "map", "odom");
       tf_broadcaster.sendTransform(map_T_odom_stamped);
       node.spinOnce();
-      status = ros::ok();
+      status = ros::ok() && !shutdown_requested.load();
       rate.sleep();
   }
   node.saveAndClose();
+  sub_lidar_odom.shutdown();
+  global_pose_publisher.shutdown();
 
   log("Exiting from fastlio JNI call.");
   return 0;
@@ -182,13 +207,20 @@ JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativ
 
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_FastLioNativeNode
- * Method:    shutdown
+ * Method:    shutdownNative
  * Signature: ()I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativeNode_shutdown
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativeNode_shutdownNative
   (JNIEnv *, jobject) {
     log("Shutting down fastlio native node.");
-    ros::shutdown();
+    shutdown_requested.store(true);
+    if (ros::isStarted()) {
+        ros::shutdown();
+    }
     return 0;
 }
 
+JNIEXPORT void JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_FastLioNativeNode_prepareNative
+  (JNIEnv *, jobject) {
+    shutdown_requested.store(false);
+}

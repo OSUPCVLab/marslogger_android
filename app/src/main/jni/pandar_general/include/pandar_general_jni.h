@@ -11,18 +11,21 @@ extern "C" {
 #define org_ros_rosjava_tutorial_native_node_PandarGeneralNativeNode_SUCCESS 0L
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_PandarGeneralNativeNode
- * Method:    execute
+ * Method:    executeNative
  * Signature: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGeneralNativeNode_execute
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGeneralNativeNode_executeNative
   (JNIEnv *, jobject, jstring, jstring, jstring, jobjectArray);
 
 /*
  * Class:     org_ros_rosjava_tutorial_native_node_PandarGeneralNativeNode
- * Method:    shutdown
+ * Method:    shutdownNative
  * Signature: ()I
  */
-JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGeneralNativeNode_shutdown
+JNIEXPORT jint JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGeneralNativeNode_shutdownNative
+  (JNIEnv *, jobject);
+
+JNIEXPORT void JNICALL Java_org_ros_rosjava_1tutorial_1native_1node_PandarGeneralNativeNode_prepareNative
   (JNIEnv *, jobject);
 
 #ifdef __cplusplus

@@ -75,6 +75,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import sensor_msgs.PointCloud2;
 import sg.edu.nus.comp.android3dvisualisationtool.app.openGLES20Support.GLES20SurfaceView;
@@ -146,9 +148,20 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
 
     private FastLioNativeNode fastlioNativeNode;
     private FasterLioNativeNode fasterLioNativeNode;
+    private final Object fastLioLifecycleLock = new Object();
+    private final Object fasterLioLifecycleLock = new Object();
+    private final ExecutorService nativeLifecycleExecutor = Executors.newSingleThreadExecutor();
+    private boolean fastLioStopping = false;
+    private boolean fasterLioStopping = false;
     private LivoxRosDriver2NativeNode livoxNativeNode = null;
+    private final Object livoxLifecycleLock = new Object();
+    private boolean livoxStopping = false;
+    private boolean livoxRestartRequested = false;
 
     private PandarGeneralNativeNode pandarNativeNode = null;
+    private final Object pandarLifecycleLock = new Object();
+    private boolean pandarStopping = false;
+    private boolean pandarRestartRequested = false;
 
     public enum LidarType {
         Mid360(0),
@@ -199,6 +212,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
 
     private ImuPublisherNode imuPublisherNode = null;
     private SensorManager mSensorManager;
+    private LocationManager mLocationManager;
 
     private static SharedPreferences mSharedPreferences;
 
@@ -548,6 +562,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         if (mPCGLView != null)
             mPCGLView.onPause();
         mImuManager.unregister();
+        stopFasterLio();
         stopRosListener();
         stopRecordSignalPublisher();
         if (lidarType == LidarType.Mid360) {
@@ -555,11 +570,26 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         } else {
             stopPandarRosDriver();
         }
-        nodeMainExecutor.shutdownNodeMain(mParameterLoaderNode);
-        mSensorManager.unregisterListener(imuPublisherNode.getAccelerometerListener());
-        mSensorManager.unregisterListener(imuPublisherNode.getGyroscopeListener());
-        mSensorManager.unregisterListener(imuPublisherNode.getOrientationListener());
+        if (mParameterLoaderNode != null) {
+            nodeMainExecutor.shutdownNodeMain(mParameterLoaderNode);
+        }
+        if (mSensorManager != null && imuPublisherNode != null) {
+            mSensorManager.unregisterListener(imuPublisherNode.getAccelerometerListener());
+            mSensorManager.unregisterListener(imuPublisherNode.getGyroscopeListener());
+            mSensorManager.unregisterListener(imuPublisherNode.getOrientationListener());
+        }
+        if (mLocationManager != null && locationPublisherNode != null) {
+            mLocationManager.removeUpdates(locationPublisherNode.getLocationListener());
+        }
+        if (imuPublisherNode != null) {
+            nodeMainExecutor.shutdownNodeMain(imuPublisherNode);
+        }
+        if (locationPublisherNode != null) {
+            nodeMainExecutor.shutdownNodeMain(locationPublisherNode);
+        }
         mParameterLoaderNode = null;
+        imuPublisherNode = null;
+        locationPublisherNode = null;
         if (mDevice != null) {
             mDevice.closeRTCM();
             mDevice.disconnect();
@@ -572,7 +602,10 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     @Override
     protected void onDestroy() {
         Timber.d("onDestroy");
-        nodeMainExecutor.shutdown();
+        nativeLifecycleExecutor.shutdown();
+        if (nodeMainExecutor != null) {
+            nodeMainExecutor.shutdown();
+        }
         mCameraHandler.invalidateHandler();     // paranoia
         super.onDestroy();
     }
@@ -650,7 +683,8 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         criteria.setCostAllowed(true);
         final String provider = LocationManager.GPS_PROVIDER;
         String svcName = Context.LOCATION_SERVICE;
-        final LocationManager locationManager = (LocationManager) getSystemService(svcName);
+        mLocationManager = (LocationManager) getSystemService(svcName);
+        final LocationManager locationManager = mLocationManager;
         final int t = 500;
         final float distance = 0.1f;
 
@@ -820,12 +854,57 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         String pcdmappath = checkPointCloudPcdMap();
         String[] extraArgs = new String[1];
         extraArgs[0] = pcdmappath;
-        fastlioNativeNode = new FastLioNativeNode(extraArgs);
-        nodeMainExecutor.execute(fastlioNativeNode, nodeConfiguration);
+        synchronized (fastLioLifecycleLock) {
+            if (fastlioNativeNode != null || fastLioStopping) {
+                Log.w(TAG, "Ignoring FAST-LIO start while the previous session is still stopping");
+                return;
+            }
+            fastlioNativeNode = new FastLioNativeNode(extraArgs);
+            nodeMainExecutor.execute(fastlioNativeNode, nodeConfiguration);
+        }
     }
 
     private void stopFastLio() {
-        fastlioNativeNode.shutdown();
+        final FastLioNativeNode node;
+        synchronized (fastLioLifecycleLock) {
+            node = fastlioNativeNode;
+            if (node == null || fastLioStopping) {
+                return;
+            }
+            fastLioStopping = true;
+        }
+
+        Button recordButton = findViewById(R.id.toggleRecording_button);
+        if (recordButton != null) {
+            recordButton.setEnabled(false);
+        }
+
+        // Signal native code immediately; only the potentially slow wait runs off the UI thread.
+        node.shutdown();
+        nodeMainExecutor.shutdownNodeMain(node);
+        nativeLifecycleExecutor.execute(() -> {
+            try {
+                node.awaitTermination();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Log.e(TAG, "Interrupted while waiting for FAST-LIO to stop", e);
+                return;
+            }
+
+            synchronized (fastLioLifecycleLock) {
+                if (fastlioNativeNode == node) {
+                    fastlioNativeNode = null;
+                }
+                fastLioStopping = false;
+            }
+            Log.i(TAG, "FAST-LIO native teardown complete");
+            runOnUiThread(() -> {
+                Button button = findViewById(R.id.toggleRecording_button);
+                if (button != null) {
+                    button.setEnabled(true);
+                }
+            });
+        });
     }
 
     private void startFasterLio(String outputDir) {
@@ -835,14 +914,55 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         nodeConfiguration.setNodeName(FasterLioNativeNode.nodeName);
         String[] extraArgs = new String[1];
         extraArgs[0] = outputDir;
-        fasterLioNativeNode = new FasterLioNativeNode(extraArgs);
-        nodeMainExecutor.execute(fasterLioNativeNode, nodeConfiguration);
+        synchronized (fasterLioLifecycleLock) {
+            if (fasterLioNativeNode != null || fasterLioStopping) {
+                Log.w(TAG, "Ignoring Faster-LIO start while the previous session is still stopping");
+                return;
+            }
+            fasterLioNativeNode = new FasterLioNativeNode(extraArgs);
+            nodeMainExecutor.execute(fasterLioNativeNode, nodeConfiguration);
+        }
     }
 
     private void stopFasterLio() {
-        fasterLioNativeNode.shutdown();
-        nodeMainExecutor.shutdownNodeMain(fasterLioNativeNode);
-        fasterLioNativeNode = null;
+        final FasterLioNativeNode node;
+        synchronized (fasterLioLifecycleLock) {
+            node = fasterLioNativeNode;
+            if (node == null || fasterLioStopping) {
+                return;
+            }
+            fasterLioStopping = true;
+        }
+
+        Button recordButton = findViewById(R.id.toggleRecording_button);
+        recordButton.setEnabled(false);
+
+        // Signal native code immediately; only the potentially slow wait runs off the UI thread.
+        node.shutdown();
+        nodeMainExecutor.shutdownNodeMain(node);
+        nativeLifecycleExecutor.execute(() -> {
+            try {
+                node.awaitTermination();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Log.e(TAG, "Interrupted while waiting for Faster-LIO to stop", e);
+                return;
+            }
+
+            synchronized (fasterLioLifecycleLock) {
+                if (fasterLioNativeNode == node) {
+                    fasterLioNativeNode = null;
+                }
+                fasterLioStopping = false;
+            }
+            Log.i(TAG, "Faster-LIO native teardown complete");
+            runOnUiThread(() -> {
+                Button button = findViewById(R.id.toggleRecording_button);
+                if (button != null) {
+                    button.setEnabled(true);
+                }
+            });
+        });
     }
 
     private void startLivoxRosDriver2() {
@@ -862,14 +982,51 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         Log.i(TAG, "host ip:" + hostip + ", lidar ip:" + lidarip);
         String[] extraArgs = new String[1];
         extraArgs[0] = userconfigpath;
-        livoxNativeNode = new LivoxRosDriver2NativeNode(extraArgs);
-        nodeMainExecutor.execute(livoxNativeNode, nodeConfiguration);
+        synchronized (livoxLifecycleLock) {
+            if (livoxStopping) {
+                livoxRestartRequested = true;
+                Log.i(TAG, "Deferring Livox restart until native teardown completes");
+                return;
+            }
+            if (livoxNativeNode != null) {
+                return;
+            }
+            livoxNativeNode = new LivoxRosDriver2NativeNode(extraArgs);
+            nodeMainExecutor.execute(livoxNativeNode, nodeConfiguration);
+        }
     }
 
     private void stopLivoxRosDriver2() {
-        livoxNativeNode.shutdown();
-        nodeMainExecutor.shutdownNodeMain(livoxNativeNode);
-        livoxNativeNode = null;
+        final LivoxRosDriver2NativeNode node;
+        synchronized (livoxLifecycleLock) {
+            node = livoxNativeNode;
+            if (node == null || livoxStopping) {
+                return;
+            }
+            livoxNativeNode = null;
+            livoxStopping = true;
+        }
+        node.shutdown();
+        nodeMainExecutor.shutdownNodeMain(node);
+        nativeLifecycleExecutor.execute(() -> {
+            try {
+                node.awaitTermination();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Log.e(TAG, "Interrupted while waiting for Livox to stop", e);
+                return;
+            }
+            final boolean restart;
+            synchronized (livoxLifecycleLock) {
+                livoxStopping = false;
+                restart = livoxRestartRequested;
+                livoxRestartRequested = false;
+            }
+            Log.i(TAG, "Livox native teardown complete");
+            if (restart && !isFinishing()) {
+                runOnUiThread(this::startLivoxRosDriver2);
+            }
+        });
     }
 
     private void startPandarRosDriver() {
@@ -891,14 +1048,51 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         extraArgs[0] = lidarip;
         extraArgs[1] = lidarCorrectionFile;
         extraArgs[2] = pandarTimeType;
-        pandarNativeNode = new PandarGeneralNativeNode(extraArgs);
-        nodeMainExecutor.execute(pandarNativeNode, nodeConfiguration);
+        synchronized (pandarLifecycleLock) {
+            if (pandarStopping) {
+                pandarRestartRequested = true;
+                Log.i(TAG, "Deferring Pandar restart until native teardown completes");
+                return;
+            }
+            if (pandarNativeNode != null) {
+                return;
+            }
+            pandarNativeNode = new PandarGeneralNativeNode(extraArgs);
+            nodeMainExecutor.execute(pandarNativeNode, nodeConfiguration);
+        }
     }
 
     private void stopPandarRosDriver() {
-        pandarNativeNode.shutdown();
-        nodeMainExecutor.shutdownNodeMain(pandarNativeNode);
-        pandarNativeNode = null;
+        final PandarGeneralNativeNode node;
+        synchronized (pandarLifecycleLock) {
+            node = pandarNativeNode;
+            if (node == null || pandarStopping) {
+                return;
+            }
+            pandarNativeNode = null;
+            pandarStopping = true;
+        }
+        node.shutdown();
+        nodeMainExecutor.shutdownNodeMain(node);
+        nativeLifecycleExecutor.execute(() -> {
+            try {
+                node.awaitTermination();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Log.e(TAG, "Interrupted while waiting for Pandar to stop", e);
+                return;
+            }
+            final boolean restart;
+            synchronized (pandarLifecycleLock) {
+                pandarStopping = false;
+                restart = pandarRestartRequested;
+                pandarRestartRequested = false;
+            }
+            Log.i(TAG, "Pandar native teardown complete");
+            if (restart && !isFinishing()) {
+                runOnUiThread(this::startPandarRosDriver);
+            }
+        });
     }
 
     private String copyLidarCorrectionFile() {
@@ -925,8 +1119,10 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     }
 
     void stopRecordSignalPublisher() {
-        nodeMainExecutor.shutdownNodeMain(recordSignalNode);
-        recordSignalNode = null;
+        if (recordSignalNode != null) {
+            nodeMainExecutor.shutdownNodeMain(recordSignalNode);
+            recordSignalNode = null;
+        }
     }
 
     private void startRosListener() {
@@ -995,9 +1191,11 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     }
 
     private void stopRosListener() {
-        rosListenerNode.shutdown();
-        nodeMainExecutor.shutdownNodeMain(rosListenerNode);
-        rosListenerNode = null;
+        if (rosListenerNode != null) {
+            rosListenerNode.shutdown();
+            nodeMainExecutor.shutdownNodeMain(rosListenerNode);
+            rosListenerNode = null;
+        }
     }
 
     private void startLaserLogging(String bagname) {
