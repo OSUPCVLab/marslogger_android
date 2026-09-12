@@ -49,15 +49,13 @@
 #  APACHE COMMONS LOGGING
 # =======================================================================
 
-# Preserve all classes in the Apache Commons Logging library.
--keep class org.apache.commons.logging.** { *; }
--keep interface org.apache.commons.logging.** { *; }
--keep class org.apache.commons.logging.impl.** { *; }
+# Commons Logging loads its factory and configured Android-compatible backend
+# reflectively. Keep those implementations, but do not retain optional adapters
+# (such as Log4JLogger) whose logging frameworks are not packaged in this app.
+-keep interface org.apache.commons.logging.Log { *; }
+-keep class org.apache.commons.logging.LogFactory { *; }
 -keep class org.apache.commons.logging.impl.LogFactoryImpl { *; }
 -keep class org.apache.commons.logging.impl.Jdk14Logger { *; }
--keepclassmembers class org.apache.commons.logging.impl.** { *; }
--keepnames class org.apache.commons.logging.** { *; }
--keepclassmembers class org.apache.commons.logging.** { *; }
 -keepattributes *Annotation*
 -dontwarn org.apache.commons.logging.**
 
