@@ -32,7 +32,7 @@ import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.ros.android.IPTool;
-//import org.ros.android.MasterChooser;
+
 import org.ros.android.RosURIPattern;
 import org.ros.exception.RosRuntimeException;
 import org.ros.node.NodeConfiguration;

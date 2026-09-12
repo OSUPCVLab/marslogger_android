@@ -13,6 +13,11 @@ configurations {
     all*.exclude group: 'org.ros.rosjava_bootstrap', module: 'gradle_plugins'
     all {
         exclude module: 'com.springsource.org.apache.commons.logging'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.net'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.httpclient'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.codec'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.io'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.lang'
         exclude module: 'httpclient'
         all*.exclude module: 'appcompat-v7'
         all*.exclude module: 'support-v4'
@@ -25,10 +30,6 @@ dependencies {
         exclude group: 'xml-apis'
         exclude group: 'junit'
     }
-    implementation ('org.ros.rosjava_core:rosjava:0.3.6') {
-        exclude group: 'xml-apis'
-        exclude group: 'junit'
-    }
 
     api 'org.ros.rosjava_messages:std_msgs:0.5.11'
     api 'org.ros.rosjava_messages:rosgraph_msgs:1.11.2'
@@ -37,24 +38,27 @@ dependencies {
     api 'org.ros.rosjava_messages:diagnostic_msgs:1.12.5'
     api "org.ros.rosjava_messages:geometry_msgs:1.12.7"
 
-    implementation "org.ros.rosjava_messages:geometry_msgs:1.12.7"
-    implementation 'org.ros.rosjava_messages:std_msgs:0.5.11'
-    implementation 'org.ros.rosjava_messages:rosgraph_msgs:1.11.2'
-    implementation 'org.ros.rosjava_messages:sensor_msgs:1.12.5'
-    implementation 'org.ros.rosjava_messages:diagnostic_msgs:1.12.5'
-    api "org.ros.rosjava_bootstrap:message_generation:0.3.3"
-    implementation "org.ros.rosjava_bootstrap:message_generation:0.3.3"
+    api("org.ros.rosjava_bootstrap:message_generation:0.3.3") {
+        exclude group: "org.apache.commons", module: "com.springsource.org.apache.commons.codec"
+        exclude group: "org.apache.commons", module: "com.springsource.org.apache.commons.io"
+        exclude group: "org.apache.commons", module: "com.springsource.org.apache.commons.lang"
+    }
+
+    implementation("org.ros.rosjava_bootstrap:message_generation:0.3.3") {
+        exclude group: "org.apache.commons", module: "com.springsource.org.apache.commons.codec"
+        exclude group: "org.apache.commons", module: "com.springsource.org.apache.commons.io"
+        exclude group: "org.apache.commons", module: "com.springsource.org.apache.commons.lang"
+    }
+    implementation 'commons-net:commons-net:3.9.0'
+    implementation 'commons-httpclient:commons-httpclient:3.1'
+    implementation 'commons-codec:commons-codec:1.15'
+    implementation 'commons-io:commons-io:2.11.0'
+    implementation 'commons-lang:commons-lang:2.6'
 
     api 'androidx.appcompat:appcompat:1.4.1'
-    implementation 'androidx.appcompat:appcompat:1.4.1'
 
     implementation "androidx.preference:preference:1.2.1"
 
-//    api "org.jboss.netty:netty:3.2.10.Final"
-//    implementation "org.jboss.netty:netty:3.2.10.Final"
-
-    // implementation for apache commons logging
     api 'commons-logging:commons-logging:1.2'
-    implementation 'commons-logging:commons-logging:1.2'
     implementation 'com.google.guava:guava:27.0.1-android'
 }

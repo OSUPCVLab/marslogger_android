@@ -3,6 +3,11 @@ apply plugin: 'com.android.application'
 configurations {
     all {
         exclude module: 'com.springsource.org.apache.commons.logging'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.net'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.httpclient'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.codec'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.io'
+        exclude group: 'org.apache.commons', module: 'com.springsource.org.apache.commons.lang'
     }
 }
 
@@ -85,7 +90,6 @@ dependencies {
     implementation project(':libraries:rosandroid-core')
 
     implementation project(':libraries:devicelib')
-//    implementation 'com.github.woncan:device:latest.release'
     implementation 'io.github.cymchad:BaseRecyclerViewAdapterHelper:3.0.14'
 
     implementation 'org.ros.rosjava_core:rosjava_helpers:[0.3, 0.4)'
@@ -103,6 +107,7 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.2.1'
+    implementation 'commons-io:commons-io:2.11.0'
     implementation 'org.apache.commons:commons-text:1.6'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
