@@ -105,12 +105,6 @@
             android:summary="Note about IP settings"
             android:defaultValue="A note on lidar IP addresses" />
 
-        <EditTextPreference
-            android:key="prefPlaceholder"
-            android:title="Placeholder"
-            android:summary="Placeholder"
-            android:defaultValue="A placeholder" />
-
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Performance Benchmark">
