@@ -39,6 +39,8 @@ import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
+import com.google.ar.core.SharedCamera;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -56,6 +58,7 @@ public class Camera2Proxy {
     private static final String TAG = "Camera2Proxy";
 
     private final CameraCapture mCameraCapture;
+    private final ArCoreRecorder mArCoreRecorder;
 
     private static SharedPreferences mSharedPreferences;
 
@@ -69,6 +72,7 @@ public class Camera2Proxy {
     private int mMaxZoomIndex;
     private Rect mScalarCropRegion;
     private CameraDevice mCameraDevice;
+    private boolean mRetryWithoutArCore;
     private CameraCaptureSession mCaptureSession;
     private CaptureRequest.Builder mPreviewRequestBuilder;
     private Rect sensorArraySize;
@@ -146,6 +150,20 @@ public class Camera2Proxy {
             Timber.w("Camera Open failed with error %d", error);
             releaseCamera();
         }
+
+        @Override
+        public void onClosed(@NonNull CameraDevice camera) {
+            if (mRetryWithoutArCore) {
+                mRetryWithoutArCore = false;
+                mArCoreRecorder.releaseSession();
+                try {
+                    mCameraManager.openCamera(mCameraIdStr, mStateCallback,
+                            mBackgroundHandler);
+                } catch (CameraAccessException error) {
+                    Timber.e(error, "Could not reopen Camera2 after ARCore failure");
+                }
+            }
+        }
     };
 
     public Integer getmTimeSourceValue() {
@@ -207,6 +225,7 @@ public class Camera2Proxy {
 
     public Camera2Proxy(CameraCapture cameraCapture) {
         mCameraCapture = cameraCapture;
+        mArCoreRecorder = cameraCapture.mArCoreRecorder;
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(mCameraCapture.activity());
         mCameraManager = (CameraManager) mCameraCapture.activity().getSystemService(Context.CAMERA_SERVICE);
         mOrientationEventListener = new OrientationEventListener(mCameraCapture.activity()) {
@@ -356,14 +375,20 @@ public class Camera2Proxy {
             initImageReader();
         mSupportSnapshot = supportSnapshot;
         try {
-            mCameraManager.openCamera(mCameraIdStr, mStateCallback, mBackgroundHandler);
+            SharedCamera sharedCamera = !supportSnapshot && mArCoreRecorder.prepare(mCameraIdStr)
+                    ? mArCoreRecorder.getSharedCamera() : null;
+            CameraDevice.StateCallback callback = sharedCamera == null ? mStateCallback
+                    : sharedCamera.createARDeviceStateCallback(mStateCallback, mBackgroundHandler);
+            mCameraManager.openCamera(mCameraIdStr, callback, mBackgroundHandler);
         } catch (CameraAccessException e) {
             Timber.e(e);
+            mArCoreRecorder.releaseSession();
         }
     }
 
     public void releaseCamera() {
         Timber.v("releaseCamera");
+        mRetryWithoutArCore = false;
         if (null != mCaptureSession) {
             mCaptureSession.close();
             mCaptureSession = null;
@@ -372,6 +397,7 @@ public class Camera2Proxy {
             mCameraDevice.close();
             mCameraDevice = null;
         }
+        mArCoreRecorder.releaseSession();
         if (mImageReader != null) {
             mImageReader.close();
             mImageReader = null;
@@ -477,7 +503,6 @@ public class Camera2Proxy {
             // fix ISO
             mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, desiredIso);
             Timber.d("ISO set to %d", desiredIso);
-        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.R)
@@ -548,6 +573,15 @@ public class Camera2Proxy {
             surfaces.add(mPreviewSurface);
             mPreviewRequestBuilder.addTarget(mPreviewSurface);
 
+            SharedCamera sharedCamera = mArCoreRecorder.getSharedCamera();
+            if (sharedCamera != null) {
+                mArCoreRecorder.setAppSurface(mCameraIdStr, mPreviewSurface);
+                for (Surface arSurface : sharedCamera.getArCoreSurfaces()) {
+                    surfaces.add(arSurface);
+                    mPreviewRequestBuilder.addTarget(arSurface);
+                }
+            }
+
             CameraCaptureSession.StateCallback captureStateCallback = new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
@@ -559,10 +593,30 @@ public class Camera2Proxy {
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                     Timber.w("ConfigureFailed. session: mCaptureSession");
+                    if (sharedCamera != null) {
+                        // A device may support ARCore but not the extra Camera2 output stream.
+                        // Reopen the original Camera2 path so ordinary recording remains usable.
+                        mArCoreRecorder.reportFailure(
+                                "ARCore camera sharing failed; Camera2 recording will continue");
+                        mRetryWithoutArCore = true;
+                        if (mCameraDevice != null) {
+                            mCameraDevice.close();
+                            mCameraDevice = null;
+                        }
+                    }
+                }
+
+                @Override
+                public void onActive(@NonNull CameraCaptureSession session) {
+                    mArCoreRecorder.resume(mFocusCaptureCallback, mBackgroundHandler);
                 }
             };
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            if (sharedCamera != null) {
+                mCameraDevice.createCaptureSession(surfaces,
+                        sharedCamera.createARSessionStateCallback(captureStateCallback,
+                                mBackgroundHandler), mBackgroundHandler);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 List<OutputConfiguration> outputConfigs = new ArrayList<>();
                 for (Surface surface : surfaces) {
                     OutputConfiguration config = new OutputConfiguration(surface);
@@ -585,13 +639,23 @@ public class Camera2Proxy {
                 mCameraDevice.createCaptureSession(surfaces,
                         captureStateCallback, mBackgroundHandler);
             }
-        } catch (CameraAccessException e) {
+        } catch (CameraAccessException | RuntimeException e) {
             Timber.e(e);
+            if (mArCoreRecorder.getSharedCamera() != null && mCameraDevice != null) {
+                mArCoreRecorder.reportFailure(
+                        "ARCore camera sharing failed; Camera2 recording will continue");
+                mRetryWithoutArCore = true;
+                mCameraDevice.close();
+                mCameraDevice = null;
+            }
         }
     }
 
     public void startPreview() {
         Timber.v("startPreview");
+        if (mArCoreRecorder.isActive()) {
+            return;
+        }
         if (mCaptureSession == null || mPreviewRequestBuilder == null) {
             Timber.w("startPreview: mCaptureSession or mPreviewRequestBuilder is null");
             return;
@@ -751,6 +815,9 @@ public class Camera2Proxy {
 
 
     void changeManualFocusPoint(ManualFocusConfig focusConfig) {
+        if (mArCoreRecorder.isActive()) {
+            return;
+        }
         float eventX = focusConfig.mEventX;
         float eventY = focusConfig.mEventY;
         int viewWidth = focusConfig.mViewWidth;

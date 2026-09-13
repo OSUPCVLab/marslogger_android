@@ -39,12 +39,14 @@ public class CameraCapture implements SurfaceTexture.OnFrameAvailableListener {
     protected int mVideoFrameWidth, mVideoFrameHeight;
     static boolean mSnapshotMode = false;
     protected Camera2Proxy mCamera2Proxy = null;
+    protected final ArCoreRecorder mArCoreRecorder;
 
     protected SampleGLView mGLView;
     protected TextureMovieEncoder sVideoEncoder = new TextureMovieEncoder();
 
     public CameraCapture(Activity activity) {
         mActivity = activity;
+        mArCoreRecorder = new ArCoreRecorder(activity);
     }
 
     protected Activity activity() {
@@ -66,7 +68,7 @@ public class CameraCapture implements SurfaceTexture.OnFrameAvailableListener {
         mGLView = glView;
         if (mRenderer == null) {
             mRenderer = new CameraSurfaceRenderer(
-                    cameraHandler, sVideoEncoder);
+                    cameraHandler, sVideoEncoder, mArCoreRecorder);
             mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
             mGLView.setRenderer(mRenderer);
             mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);

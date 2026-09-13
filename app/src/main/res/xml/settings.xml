@@ -47,6 +47,14 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="ARCore Settings">
+        <SwitchPreference
+            android:key="prefArCoreRecording"
+            android:title="Record ARCore camera pose"
+            android:summary="Uses Google Play Services for AR (ARCore), provided by Google LLC and governed by the Google Privacy Policy. Requires a supported device and the ARCore camera."
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="IMU Settings" >
 
         <ListPreference

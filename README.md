@@ -22,6 +22,25 @@ This branch provides the source code of the Android app running on the smartphon
 - a Livox Mid360 LiDAR and an Android smartphone, or
 - a Hesai PandarXT32 LiDAR and an Android smartphone.
 
+# Optional ARCore recording
+
+In Settings, enable **Record ARCore camera pose** before opening the camera or LiDAR capture screen. 
+This requires an ARCore-supported device with Google Play Services for AR installed and the selected camera matching ARCore's camera. 
+If ARCore cannot share that camera, the app reports the issue and continues its normal Camera2/IMU/LiDAR recording.
+
+Each recording session writes `arcore_poses.csv` beside `movie.mp4`, `movie_metadata.csv`, and `gyro_accel.csv` when ARCore starts successfully.
+Each row contains the Android camera timestamp in nanoseconds, tracking state, camera translation and quaternion, 
+and unrotated CPU-image intrinsics and dimensions. 
+`timestamp_ns` uses the Camera2 `CaptureResult.SENSOR_TIMESTAMP` clock. `movie_metadata.csv` converts that timestamp to uptime seconds, so do not compare those columns directly; 
+consult `edge_epochs.txt` for the camera clock source when aligning with IMU data. 
+`world_origin_id` changes if the activity pauses and ARCore creates a new world origin during the same recording. 
+Pose values are meaningful when `tracking_state` is `TRACKING`.
+
+To check it on a device, record while moving the phone through a textured, well-lit area. 
+After stopping, confirm `arcore_poses.csv` has rows with increasing timestamps and `TRACKING` states, 
+and that the usual video, Camera2 metadata, and IMU files are still present.
+Repeat with the setting off to confirm no ARCore CSV is created.
+
 # Build and Install
 
 If you do not need to modify the source code, you can skip the build step and directly install the [released Android APK](https://github.com/OSUPCVLab/marslogger_android/releases/tag/v2.1).

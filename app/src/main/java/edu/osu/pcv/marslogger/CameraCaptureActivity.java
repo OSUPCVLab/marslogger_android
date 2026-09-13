@@ -263,6 +263,7 @@ public class CameraCaptureActivity extends Activity
     @Override
     protected void onDestroy() {
         Timber.d("onDestroy");
+        mCameraCapture.mArCoreRecorder.stopRecording();
         super.onDestroy();
         mCameraHandler.invalidateHandler();     // paranoia
     }
@@ -302,7 +303,9 @@ public class CameraCaptureActivity extends Activity
             mImuManager.startRecording(inertialFile);
             mCameraCapture.mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
+            mCameraCapture.mArCoreRecorder.startRecording(outputDir);
         } else {
+            mCameraCapture.mArCoreRecorder.stopRecording();
             mCameraCapture.mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();
             mGpsManager.stopRecording();

@@ -602,6 +602,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     @Override
     protected void onDestroy() {
         Timber.d("onDestroy");
+        mCameraCapture.mArCoreRecorder.stopRecording();
         nativeLifecycleExecutor.shutdown();
         if (nodeMainExecutor != null) {
             nodeMainExecutor.shutdown();
@@ -633,10 +634,12 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
             startGnssRtkRecording(gnssRtkFile);
             mCameraCapture.mCamera2Proxy.startRecordingCaptureResult(
                     outputDir + File.separator + "movie_metadata.csv");
+            mCameraCapture.mArCoreRecorder.startRecording(outputDir);
             startFasterLio(outputDir);
             startLaserLogging2(outputDir + File.separator + "lidar.bag");
             rosListenerNode.setRecording(true);
         } else {
+            mCameraCapture.mArCoreRecorder.stopRecording();
             mCameraCapture.mCamera2Proxy.stopRecordingCaptureResult();
             stopGnssRtkRecording();
             mImuManager.stopRecording();

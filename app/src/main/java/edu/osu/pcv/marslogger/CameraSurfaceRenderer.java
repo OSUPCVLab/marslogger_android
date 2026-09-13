@@ -31,6 +31,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
     private CameraHandler mCameraHandler;
     private TextureMovieEncoder mVideoEncoder;
+    private final ArCoreRecorder mArCoreRecorder;
     private String mOutputFile;
     private String mTimeFile;
 
@@ -64,9 +65,11 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      * @param movieEncoder  video encoder object
      */
     public CameraSurfaceRenderer(CameraHandler cameraHandler,
-                                 TextureMovieEncoder movieEncoder) {
+                                 TextureMovieEncoder movieEncoder,
+                                 ArCoreRecorder arCoreRecorder) {
         mCameraHandler = cameraHandler;
         mVideoEncoder = movieEncoder;
+        mArCoreRecorder = arCoreRecorder;
         mTextureId = -1;
 
         mRecordingStatus = -1;
@@ -228,6 +231,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                 new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_EXT));
 
         mTextureId = mFullScreen.createTextureObject();
+        mArCoreRecorder.onGlSurfaceCreated();
 
         // Create a SurfaceTexture, with an external texture, in this EGL context.  We don't
         // have a Looper in this thread -- GLSurfaceView doesn't create one -- so the frame
@@ -253,6 +257,9 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
         // Latch the latest frame.  If there isn't anything new, we'll just re-use whatever
         // was there before.
         mSurfaceTexture.updateTexImage();
+        if (mIncomingWidth > 0 && mIncomingHeight > 0) {
+            mArCoreRecorder.onDrawFrame(mIncomingWidth, mIncomingHeight);
+        }
 
         // If the recording state is changing, take care of it here.  Ideally we wouldn't
         // be doing all this in onDrawFrame(), but the EGLContext sharing with GLSurfaceView
