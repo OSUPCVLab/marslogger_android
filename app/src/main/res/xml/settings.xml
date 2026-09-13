@@ -123,4 +123,11 @@
             android:defaultValue="false" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Recording Data">
+        <Preference
+            android:key="prefExportRecordingData"
+            android:title="Export Recording Data"
+            android:summary="Copy a completed session to a folder you choose, such as Documents/MarsLogger" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

@@ -3,6 +3,7 @@ package edu.osu.pcv.marslogger;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
@@ -14,6 +15,8 @@ import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.RequiresApi;
 import androidx.preference.EditTextPreference;
@@ -27,6 +30,13 @@ import android.util.Range;
 import android.util.Size;
 
 import android.widget.Toast;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
@@ -47,6 +57,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import timber.log.Timber;
@@ -63,7 +76,17 @@ import edu.osu.pcv.marslogger.benchmark.BenchmarkSessionManager;
 
 public class SettingsFragment extends PreferenceFragmentCompat
         implements SharedPreferences.OnSharedPreferenceChangeListener {
+    private static final String STATE_EXPORT_SESSION = "export_session";
+    private static final ExecutorService EXPORT_EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final AtomicBoolean EXPORT_BUSY = new AtomicBoolean(false);
+
     private OnFragmentInteractionListener mListener;
+    private ActivityResultLauncher<Intent> exportFolderPicker;
+    private String pendingExportSession;
+    private AtomicBoolean exportCancelled;
+    private AlertDialog exportProgressDialog;
+    private ProgressBar exportProgressBar;
+    private TextView exportProgressText;
     private Range<Integer> isoRange = null;
     private Range<Float> exposureTimeRangeMs = null;
 
@@ -90,6 +113,33 @@ public class SettingsFragment extends PreferenceFragmentCompat
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            pendingExportSession = savedInstanceState.getString(STATE_EXPORT_SESSION);
+        }
+        exportFolderPicker = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(), result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null &&
+                            result.getData().getData() != null) {
+                        startExport(result.getData().getData());
+                    }
+                });
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_EXPORT_SESSION, pendingExportSession);
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (exportProgressDialog != null) {
+            exportProgressDialog.dismiss();
+            exportProgressDialog = null;
+        }
+        exportProgressBar = null;
+        exportProgressText = null;
+        super.onDestroyView();
     }
 
     @Override
@@ -107,6 +157,12 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
                 getActivity());
+
+        Preference exportPreference = findPreference("prefExportRecordingData");
+        exportPreference.setOnPreferenceClickListener(preference -> {
+            showExportSessions();
+            return true;
+        });
 
         Preference benchmarkPreference = findPreference("prefBenchmarkEnabled");
         BenchmarkSessionManager benchmarkManager =
@@ -313,6 +369,162 @@ public class SettingsFragment extends PreferenceFragmentCompat
         if (lidarid.length() > 0)
             sharedPreferences.edit().putString("prefLidarId", lidarid).apply();
 
+    }
+
+    private void showExportSessions() {
+        if (EXPORT_BUSY.get()) {
+            Toast.makeText(requireContext(), "An export is already running", Toast.LENGTH_SHORT)
+                    .show();
+            return;
+        }
+        List<RecordingExportManager.SessionInfo> sessions =
+                RecordingExportManager.listSessions(requireContext());
+        if (sessions.isEmpty()) {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle("Export Recording Data")
+                    .setMessage("No recording sessions were found. Stop a recording, then try again.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        String[] choices = new String[sessions.size() + 1];
+        choices[0] = "Latest session: " + sessions.get(0).name;
+        for (int index = 0; index < sessions.size(); index++) {
+            choices[index + 1] = sessions.get(index).name;
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Export Recording Data")
+                .setItems(choices, (dialog, choice) -> {
+                    pendingExportSession = sessions.get(choice == 0 ? 0 : choice - 1).name;
+                    Toast.makeText(requireContext(),
+                            "Choose Documents or another folder for MarsLogger",
+                            Toast.LENGTH_LONG).show();
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    exportFolderPicker.launch(intent);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startExport(Uri destinationTree) {
+        RecordingExportManager.SessionInfo session =
+                RecordingExportManager.findSession(requireContext(), pendingExportSession);
+        pendingExportSession = null;
+        if (session == null) {
+            Toast.makeText(requireContext(), "The selected recording is no longer available",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!EXPORT_BUSY.compareAndSet(false, true)) {
+            Toast.makeText(requireContext(), "An export is already running", Toast.LENGTH_SHORT)
+                    .show();
+            return;
+        }
+        Context appContext = requireContext().getApplicationContext();
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        exportCancelled = cancelled;
+        showExportProgress(session.name);
+        EXPORT_EXECUTOR.execute(() -> {
+            RecordingExportManager.ExportResult result = null;
+            Exception failure = null;
+            try {
+                result = RecordingExportManager.export(appContext, session, destinationTree,
+                        (copied, total, file) -> mainHandler.post(() ->
+                                updateExportProgress(appContext, copied, total, file)), cancelled);
+            } catch (Exception error) {
+                failure = error;
+                Timber.e(error, "Recording export failed");
+            } finally {
+                EXPORT_BUSY.set(false);
+            }
+            RecordingExportManager.ExportResult completed = result;
+            Exception error = failure;
+            mainHandler.post(() -> finishExport(appContext, completed, error));
+        });
+    }
+
+    private void showExportProgress(String sessionName) {
+        Context context = requireContext();
+        int padding = (int) (24 * getResources().getDisplayMetrics().density + 0.5f);
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(padding, padding, padding, padding);
+        exportProgressText = new TextView(context);
+        exportProgressText.setText("Preparing export…");
+        layout.addView(exportProgressText);
+        exportProgressBar = new ProgressBar(context, null,
+                android.R.attr.progressBarStyleHorizontal);
+        exportProgressBar.setMax(1000);
+        exportProgressBar.setIndeterminate(true);
+        layout.addView(exportProgressBar);
+        exportProgressDialog = new AlertDialog.Builder(context)
+                .setTitle("Exporting " + sessionName)
+                .setView(layout)
+                .setNegativeButton("Cancel", (dialog, which) -> exportCancelled.set(true))
+                .create();
+        exportProgressDialog.setCanceledOnTouchOutside(false);
+        exportProgressDialog.show();
+    }
+
+    private void updateExportProgress(Context context, long copied, long total, String file) {
+        if (exportProgressDialog == null || !exportProgressDialog.isShowing()) {
+            return;
+        }
+        exportProgressBar.setIndeterminate(false);
+        exportProgressBar.setProgress(total == 0 ? 1000
+                : (int) Math.min(1000, 1000.0 * copied / total));
+        exportProgressText.setText(android.text.format.Formatter.formatFileSize(context, copied)
+                + " / " + android.text.format.Formatter.formatFileSize(context, total)
+                + (file.isEmpty() ? "" : "\n" + file));
+    }
+
+    private void finishExport(Context appContext, RecordingExportManager.ExportResult result,
+                              Exception error) {
+        if (exportProgressDialog != null) {
+            exportProgressDialog.dismiss();
+            exportProgressDialog = null;
+        }
+        exportProgressBar = null;
+        exportProgressText = null;
+        exportCancelled = null;
+
+        String title;
+        String message;
+        if (result != null) {
+            title = "Export complete";
+            message = "Copied to MarsLogger/" + result.folderName +
+                    " inside the selected folder (" +
+                    android.text.format.Formatter.formatFileSize(appContext, result.bytesCopied)
+                    + ").";
+        } else if (error instanceof RecordingExportManager.ExportCancelledException) {
+            title = "Export cancelled";
+            message = error.getSuppressed().length == 0
+                    ? "The incomplete session copy was removed."
+                    : "The partial copy may still be present in MarsLogger.";
+        } else {
+            title = "Export failed";
+            String detail = error == null ? null : error.getMessage();
+            if (detail != null && (detail.contains("ENOSPC") ||
+                    detail.contains("No space left"))) {
+                message = "Not enough free space at the destination. Free space and retry.";
+            } else {
+                message = detail == null ? "Could not export the session."
+                        : detail + " Check available space and folder access, then retry.";
+            }
+        }
+        if (error != null && error.getSuppressed().length > 0 &&
+                !(error instanceof RecordingExportManager.ExportCancelledException)) {
+            message += " The partial copy may still be present in MarsLogger.";
+        }
+        if (isAdded() && getView() != null) {
+            new AlertDialog.Builder(requireContext()).setTitle(title).setMessage(message)
+                    .setPositiveButton("OK", null).show();
+        } else {
+            Toast.makeText(appContext, title + ": " + message, Toast.LENGTH_LONG).show();
+        }
     }
 
     private void updateBenchmarkSummary(Preference preference,

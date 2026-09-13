@@ -172,6 +172,7 @@ public class CameraCaptureActivity extends Activity
 
     private CameraHandler mCameraHandler;
     private boolean mRecordingEnabled;      // controls button state
+    private String mCurrentRecordingDir;
 
     private IMUManager mImuManager;
     private GPSManager mGpsManager;
@@ -289,6 +290,8 @@ public class CameraCaptureActivity extends Activity
         mRecordingEnabled = !mRecordingEnabled;
         if (mRecordingEnabled) {
             String outputDir = mCameraCapture.renewOutputDir();
+            mCurrentRecordingDir = outputDir;
+            RecordingExportManager.markRecordingStarted(outputDir);
             String outputFile = outputDir + File.separator + "movie.mp4";
             String metaFile = outputDir + File.separator + "frame_timestamps.txt";
             String basename = outputDir.substring(outputDir.lastIndexOf("/")+1);
@@ -312,6 +315,10 @@ public class CameraCaptureActivity extends Activity
             mTimeBaseManager.stopRecording();
         }
         mCameraCapture.toggleRecording(mRecordingEnabled);
+        if (!mRecordingEnabled) {
+            RecordingExportManager.markRecordingCompleted(mCurrentRecordingDir);
+            mCurrentRecordingDir = null;
+        }
         updateControls();
     }
 

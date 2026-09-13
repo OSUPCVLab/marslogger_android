@@ -126,6 +126,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
 
     private CameraHandler mCameraHandler;
     private boolean mRecordingEnabled;      // controls button state
+    private String mCurrentRecordingDir;
 
     private IMUManager mImuManager;
     private GPSManager mGpsManager;
@@ -618,6 +619,8 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         mRecordingEnabled = !mRecordingEnabled;
         if (mRecordingEnabled) {
             String outputDir = mCameraCapture.renewOutputDir();
+            mCurrentRecordingDir = outputDir;
+            RecordingExportManager.markRecordingStarted(outputDir);
             String outputFile = outputDir + File.separator + "movie.mp4";
             String timeFile = outputDir + File.separator + "frame_timestamps.txt";
             String basename = outputDir.substring(outputDir.lastIndexOf("/")+1);
@@ -650,6 +653,10 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
             stopFasterLio();
         }
         mCameraCapture.toggleRecording(mRecordingEnabled);
+        if (!mRecordingEnabled) {
+            RecordingExportManager.markRecordingCompleted(mCurrentRecordingDir);
+            mCurrentRecordingDir = null;
+        }
         updateControls();
     }
 

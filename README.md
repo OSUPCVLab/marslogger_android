@@ -41,6 +41,17 @@ After stopping, confirm `arcore_poses.csv` has rows with increasing timestamps a
 and that the usual video, Camera2 metadata, and IMU files are still present.
 Repeat with the setting off to confirm no ARCore CSV is created.
 
+# Export recording data
+
+After stopping a recording, open Settings and tap **Export Recording Data**.
+Choose **Latest session** or a dated session, then select the phone's **Documents** folder in the Android folder picker.
+MarsLogger copies the complete session to `Documents/MarsLogger/<session>/`;
+selecting another folder creates `MarsLogger/<session>/` there instead.
+Recordings left unfinished are omitted from the list.
+Existing exports are kept, with a numbered folder name for a repeat export.
+Keep the app open until the progress dialog reports completion.
+The original recording stays in app-private storage.
+
 # Build and Install
 
 If you do not need to modify the source code, you can skip the build step and directly install the [released Android APK](https://github.com/OSUPCVLab/marslogger_android/releases/tag/v2.1).
