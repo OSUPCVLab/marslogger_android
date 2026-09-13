@@ -10,8 +10,7 @@ import java.nio.FloatBuffer;
 
 /** Draws world-frame voxel centroids in the main LiDAR view. */
 final class GlobalVoxelOverlay {
-    private FloatBuffer centroids;
-    private int count;
+    private volatile CloudSnapshot snapshot;
     private int program;
     private int positionHandle;
     private int matrixHandle;
@@ -21,19 +20,19 @@ final class GlobalVoxelOverlay {
     }
 
     void setCentroids(float[] xyz) {
-        count = xyz.length / 3;
-        centroids = ByteBuffer.allocateDirect(xyz.length * Float.BYTES)
+        FloatBuffer centroids = ByteBuffer.allocateDirect(xyz.length * Float.BYTES)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
         centroids.put(xyz).position(0);
+        snapshot = new CloudSnapshot(centroids, xyz.length / 3);
     }
 
     void clear() {
-        centroids = null;
-        count = 0;
+        snapshot = null;
     }
 
     void draw(float[] cloudMvp, float[] cloudTransform) {
-        if (count == 0 || centroids == null || !ensureProgram()) return;
+        CloudSnapshot cloud = snapshot;
+        if (cloud == null || cloud.count == 0 || !ensureProgram()) return;
         float[] model = new float[16];
         float[] mvp = new float[16];
         Matrix.setIdentityM(model, 0);
@@ -43,11 +42,22 @@ final class GlobalVoxelOverlay {
         Matrix.multiplyMM(mvp, 0, cloudMvp, 0, model, 0);
         GLES20.glUseProgram(program);
         GLES20.glUniformMatrix4fv(matrixHandle, 1, false, mvp, 0);
-        centroids.position(0);
+        cloud.centroids.position(0);
         GLES20.glEnableVertexAttribArray(positionHandle);
-        GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, centroids);
-        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, count);
+        GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0,
+                cloud.centroids);
+        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, cloud.count);
         GLES20.glDisableVertexAttribArray(positionHandle);
+    }
+
+    private static final class CloudSnapshot {
+        final FloatBuffer centroids;
+        final int count;
+
+        CloudSnapshot(FloatBuffer centroids, int count) {
+            this.centroids = centroids;
+            this.count = count;
+        }
     }
 
     private boolean ensureProgram() {

@@ -27,10 +27,11 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     private static final String TAG = "GLES20Renderer";
     private Points mPoints;
     private final Object lock = new Object();
+    private final Object mapLock = new Object();
     private final TrajectoryOverlay trajectories = new TrajectoryOverlay();
     private final GlobalVoxelMap globalMap = new GlobalVoxelMap();
     private final GlobalVoxelOverlay globalOverlay = new GlobalVoxelOverlay();
-    private GlobalVoxelMap.Pose currentLidarPose;
+    private volatile GlobalVoxelMap.Pose currentLidarPose;
     private int rawScansSinceSnapshot;
 //    private final AtomicReference<Points> mPoints = new AtomicReference<>();
     private VirtualSphere vs = new VirtualSphere();
@@ -88,7 +89,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     }
 
     public void clearGlobalMap() {
-        synchronized (lock) {
+        synchronized (mapLock) {
             globalMap.clear();
             globalOverlay.clear();
             currentLidarPose = null;
@@ -100,9 +101,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
             double qx, double qy, double qz, double qw) {
         try {
             GlobalVoxelMap.Pose pose = new GlobalVoxelMap.Pose(x, y, z, qx, qy, qz, qw);
-            synchronized (lock) {
-                currentLidarPose = pose;
-            }
+            currentLidarPose = pose;
         } catch (IllegalArgumentException error) {
             Log.w(TAG, "Skipping invalid LiDAR visualization pose", error);
         }
@@ -110,7 +109,8 @@ public class GLES20Renderer extends GLRenderer implements Constants {
 
     /** Raw sensor-frame points are transformed by the current odometry pose. */
     public boolean appendRawCloud(PointCloud2 msg) {
-        synchronized (lock) {
+        // Scan insertion and snapshot creation are CPU-heavy; keep them off the draw lock.
+        synchronized (mapLock) {
             GlobalVoxelMap.Pose pose = currentLidarPose;
             if (pose == null) return false;
             PCConverter.forEachXYZ(msg, (x, y, z) -> globalMap.addPoint(x, y, z, pose));
@@ -122,7 +122,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     }
 
     public void flushGlobalMap() {
-        synchronized (lock) {
+        synchronized (mapLock) {
             rawScansSinceSnapshot = 0;
             globalOverlay.setCentroids(globalMap.snapshotCentroids());
         }
