@@ -8,10 +8,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import edu.osu.pcv.marslogger.benchmark.PipelinePerformanceLogger;
+import org.ollide.rosandroid.PCConverter;
+import sensor_msgs.PointCloud2;
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.NavigationDrawerFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.axis.Axes;
 import sg.edu.nus.comp.android3dvisualisationtool.app.configuration.Constants;
 import sg.edu.nus.comp.android3dvisualisationtool.app.points.CubeBuilder;
+import sg.edu.nus.comp.android3dvisualisationtool.app.points.GlobalVoxelMap;
 import sg.edu.nus.comp.android3dvisualisationtool.app.points.Point;
 import sg.edu.nus.comp.android3dvisualisationtool.app.points.Points;
 import sg.edu.nus.comp.android3dvisualisationtool.app.util.VirtualSphere;
@@ -25,6 +28,10 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     private Points mPoints;
     private final Object lock = new Object();
     private final TrajectoryOverlay trajectories = new TrajectoryOverlay();
+    private final GlobalVoxelMap globalMap = new GlobalVoxelMap();
+    private final GlobalVoxelOverlay globalOverlay = new GlobalVoxelOverlay();
+    private GlobalVoxelMap.Pose currentLidarPose;
+    private int rawScansSinceSnapshot;
 //    private final AtomicReference<Points> mPoints = new AtomicReference<>();
     private VirtualSphere vs = new VirtualSphere();
     private android.graphics.Point cueCenter = new android.graphics.Point();
@@ -80,6 +87,47 @@ public class GLES20Renderer extends GLRenderer implements Constants {
         }
     }
 
+    public void clearGlobalMap() {
+        synchronized (lock) {
+            globalMap.clear();
+            globalOverlay.clear();
+            currentLidarPose = null;
+            rawScansSinceSnapshot = 0;
+        }
+    }
+
+    public void setLidarPose(double x, double y, double z,
+            double qx, double qy, double qz, double qw) {
+        try {
+            GlobalVoxelMap.Pose pose = new GlobalVoxelMap.Pose(x, y, z, qx, qy, qz, qw);
+            synchronized (lock) {
+                currentLidarPose = pose;
+            }
+        } catch (IllegalArgumentException error) {
+            Log.w(TAG, "Skipping invalid LiDAR visualization pose", error);
+        }
+    }
+
+    /** Raw sensor-frame points are transformed by the current odometry pose. */
+    public boolean appendRawCloud(PointCloud2 msg) {
+        synchronized (lock) {
+            GlobalVoxelMap.Pose pose = currentLidarPose;
+            if (pose == null) return false;
+            PCConverter.forEachXYZ(msg, (x, y, z) -> globalMap.addPoint(x, y, z, pose));
+            if (++rawScansSinceSnapshot < 5) return false;
+            rawScansSinceSnapshot = 0;
+            globalOverlay.setCentroids(globalMap.snapshotCentroids());
+            return true;
+        }
+    }
+
+    public void flushGlobalMap() {
+        synchronized (lock) {
+            rawScansSinceSnapshot = 0;
+            globalOverlay.setCentroids(globalMap.snapshotCentroids());
+        }
+    }
+
     public void appendPoints(List<Point> points) {
         if (points.isEmpty())
             return;
@@ -124,6 +172,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
         if (isContextLost) {
             // context is lost, we need to recreate everything
             trajectories.onContextCreated();
+            globalOverlay.onContextCreated();
 
             // Set the background frame color
             GLES20.glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
@@ -186,6 +235,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
         Matrix.multiplyMM(scratch, 0, mMVPMatrix, 0, mRotationMatrix, 0);
 
         synchronized (lock) {
+            globalOverlay.draw(scratch, mPoints.getDisplayTransform());
             mPoints.draw(scratch, windowWidth);
             trajectories.draw(scratch, mPoints.getDisplayTransform());
         }

@@ -94,6 +94,8 @@ import org.ollide.rosandroid.RecordSignalNode;
 import org.ollide.rosandroid.LocationUpdateListener;
 import org.ollide.rosandroid.FrameNumberListener;
 import org.ollide.rosandroid.PCConverter;
+import org.ollide.rosandroid.RawPCListener;
+import org.ollide.rosandroid.RawTimestampListener;
 import org.ollide.rosandroid.WorldPCListener;
 import org.ollide.rosandroid.RosListenerNode;
 import org.ros.android.IPTool;
@@ -752,6 +754,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
             mGpsManager.stopRecording();
             mTimeBaseManager.stopRecording();
             rosListenerNode.setRecording(false);
+            mPCGLView.flushGlobalMap();
             stopLaserLogging2();
             stopFasterLio();
         }
@@ -1296,6 +1299,12 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
                     match.differenceNs, match.matchedPosePairs));
             out.write("L_T_C_row_major="
                     + Arrays.toString(ArCoreLidarAlignment.L_T_C.matrixRowMajor()) + "\n");
+            out.write("ARCORE_T_OPTICAL_row_major="
+                    + Arrays.toString(ArCoreLidarAlignment.ARCORE_T_OPTICAL.matrixRowMajor())
+                    + "\n");
+            out.write("L_T_C_arcore_row_major="
+                    + Arrays.toString(ArCoreLidarAlignment.L_T_C_ARCORE.matrixRowMajor())
+                    + "\n");
             out.write("Wl_T_Wc_row_major=" + matrix + "\n");
         } catch (IOException error) {
             Timber.w(error, "Could not save ARCore-LiDAR alignment");
@@ -1316,8 +1325,15 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
             out.write("matched_pose_pairs_at_initialization: " + match.matchedPosePairs + "\n");
             out.write("lidar_sensor_to_boot_offset_ns: "
                     + mPoseTimestampConverter.lidarSensorToBootOffsetNs() + "\n");
+            out.write("L_T_C_frame: optical_x_right_y_down_z_forward\n");
             out.write("L_T_C_row_major: "
                     + Arrays.toString(ArCoreLidarAlignment.L_T_C.matrixRowMajor()) + "\n");
+            out.write("ARCORE_T_OPTICAL_row_major: "
+                    + Arrays.toString(ArCoreLidarAlignment.ARCORE_T_OPTICAL.matrixRowMajor())
+                    + "\n");
+            out.write("L_T_C_arcore_row_major: "
+                    + Arrays.toString(ArCoreLidarAlignment.L_T_C_ARCORE.matrixRowMajor())
+                    + "\n");
             out.write("Wl_T_Wc:\n");
             for (int row = 0; row < 4; row++) {
                 out.write("  - " + Arrays.toString(Arrays.copyOfRange(matrix,
@@ -1415,7 +1431,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
                 );
             }
         });
-
+        // local point cloud map of a sliding window of point cloud frames.
         rosListenerNode.setOnWorldPCListener(new WorldPCListener() {
             @Override
             public void onWorldPC(PointCloud2 msg) {
@@ -1437,6 +1453,13 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
                     performanceLogger.onOpenGlHandoff(timing);
                 }
                 mPCGLView.requestRender();
+            }
+        });
+        // global point cloud map aggregated from point cloud frames.
+        rosListenerNode.setOnRawPCListener(new RawPCListener() {
+            @Override
+            public void onRawPC(PointCloud2 msg) {
+                mPCGLView.appendRawCloud(msg);
             }
         });
 

@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import sg.edu.nus.comp.android3dvisualisationtool.app.configuration.Constants;
@@ -22,18 +23,18 @@ public class Points implements Constants {
 
     private static final String fragmentShaderCode =
             "precision mediump float;" +
-                    "uniform vec4 vColor;" +
+                    "varying vec4 vColor;" +
                     "void main() {" +
                     "  gl_FragColor = vColor;" +
                     "}";
 
     private static ScaleConfiguration sc;
     private static FloatBuffer vertexBuffer;
+    private static FloatBuffer colorBuffer;
     private static FloatBuffer lineBuffer;
     private static FloatBuffer curvatureBuffer;
     private static int mProgram;
     private static int mPositionHandle;
-    private static int mColorHandle;
     private static int mMVPMatrixHandle;
     private static float radius;
     private static float scaleFactor;
@@ -44,9 +45,11 @@ public class Points implements Constants {
     private static final int COORDS_PER_VERTEX = 3;
     private static List<Point> pointsList;
     private static float[] pointCoords;
+    private static float[] colorCoords;
     private static float[] lineCoords;
     private static float[] curvaturePointCoords;
     private static int vertexCount = 0;
+    private static int mVertexColorHandle;
     private static final int vertexStride = COORDS_PER_VERTEX * 4; // 4 bytes per vertex
 
     private static boolean isSetOrigin = DEFAULT_IS_SET_TO_ORIGIN;
@@ -129,6 +132,35 @@ public class Points implements Constants {
             curvaturePointCoords[3 * i + 1] = p.getY() * scaleFactor - (float) shift[1];
             curvaturePointCoords[3 * i + 2] = p.getZ() * scaleFactor - (float) shift[2];
         }
+        generateColorCoords(normalPoints);
+    }
+
+    /** Clip to the 5th/95th intensity percentiles so a few returns cannot wash out a scan. */
+    private void generateColorCoords(List<Point> visiblePoints) {
+        float[] measured = new float[visiblePoints.size()];
+        int measuredCount = 0;
+        for (Point p : visiblePoints) {
+            if (Float.isFinite(p.getIntensity())) measured[measuredCount++] = p.getIntensity();
+        }
+        Arrays.sort(measured, 0, measuredCount);
+        int lowIndex = measuredCount * 5 / 100;
+        int highIndex = Math.max(lowIndex, measuredCount * 95 / 100 - 1);
+        float low = measuredCount == 0 ? 0f : measured[lowIndex];
+        float high = measuredCount == 0 ? 1f : measured[highIndex];
+        colorCoords = new float[visiblePoints.size() * 4];
+        for (int i = 0; i < visiblePoints.size(); i++) {
+            float value = visiblePoints.get(i).getIntensity();
+            if (Float.isFinite(value)) {
+                float normalized = high > low ? (value - low) / (high - low) : 0.5f;
+                normalized = Math.max(0f, Math.min(1f, normalized));
+                colorCoords[4 * i] = 0.30f + 0.70f * normalized;
+                colorCoords[4 * i + 1] = 0.22f + 0.68f * normalized;
+                colorCoords[4 * i + 2] = 0.08f + 0.30f * normalized;
+                colorCoords[4 * i + 3] = 1f;
+            } else {
+                System.arraycopy(DEFAULT_COLOR, 0, colorCoords, 4 * i, 4);
+            }
+        }
     }
 
     private void generateCoordsArray() {
@@ -207,6 +239,12 @@ public class Points implements Constants {
         // set the buffer to read the first coordinate
         vertexBuffer.position(0);
 
+        bb = ByteBuffer.allocateDirect(colorCoords.length * 4);
+        bb.order(ByteOrder.nativeOrder());
+        colorBuffer = bb.asFloatBuffer();
+        colorBuffer.put(colorCoords);
+        colorBuffer.position(0);
+
         if (isNormalVectorVisible && isPointContainsNormalVector) {
             bb = ByteBuffer.allocateDirect(lineCoords.length * 4);
             bb.order(ByteOrder.nativeOrder());
@@ -228,6 +266,7 @@ public class Points implements Constants {
     private void preSetup() {
         updateRadiusProgram();
         generateCoordsArray();
+        generateColorCoords(pointsList);
         initBuffer();
         prepareProgram();
     }
@@ -236,9 +275,11 @@ public class Points implements Constants {
         vertexShaderCode =
                 "uniform mat4 uMVPMatrix;" +
                         "attribute vec4 vPosition;" +
+                        "attribute vec4 aColor; varying vec4 vColor;" +
                         "void main() {" +
                         "  gl_Position = uMVPMatrix * vPosition;" +
                         "  gl_PointSize = " + radius + ";" +
+                        "  vColor = aColor;" +
                         "}";
     }
 
@@ -293,10 +334,11 @@ public class Points implements Constants {
                 GLES20.GL_FLOAT, false,
                 vertexStride, vertexBuffer);
 
-        // get handle to fragment shader's vColor member
-        mColorHandle = GLES20.glGetUniformLocation(mProgram, "vColor");
-
-        GLES20.glUniform4fv(mColorHandle, 1, DEFAULT_COLOR, 0);
+        mVertexColorHandle = GLES20.glGetAttribLocation(mProgram, "aColor");
+        GLES20.glEnableVertexAttribArray(mVertexColorHandle);
+        colorBuffer.position(0);
+        GLES20.glVertexAttribPointer(mVertexColorHandle, 4, GLES20.GL_FLOAT,
+                false, 4 * 4, colorBuffer);
 
         // get handle to shape's transformation matrix
         mMVPMatrixHandle = GLES20.glGetUniformLocation(mProgram, "uMVPMatrix");
@@ -314,6 +356,9 @@ public class Points implements Constants {
 
         if (isNormalVectorVisible && isPointContainsNormalVector) {
             GLES20.glLineWidth(radius / 2);
+            GLES20.glDisableVertexAttribArray(mVertexColorHandle);
+            GLES20.glVertexAttrib4f(mVertexColorHandle,
+                    DEFAULT_COLOR[0], DEFAULT_COLOR[1], DEFAULT_COLOR[2], 1f);
 
             GLES20.glVertexAttribPointer(
                     mPositionHandle, COORDS_PER_VERTEX,
@@ -323,7 +368,9 @@ public class Points implements Constants {
         }
 
         if (isShowingCurvature) {
-            GLES20.glUniform4fv(mColorHandle, 1, CURVATURE_COLOR, 0);
+            GLES20.glDisableVertexAttribArray(mVertexColorHandle);
+            GLES20.glVertexAttrib4f(mVertexColorHandle,
+                    CURVATURE_COLOR[0], CURVATURE_COLOR[1], CURVATURE_COLOR[2], 1f);
             GLES20.glVertexAttribPointer(
                     mPositionHandle, COORDS_PER_VERTEX,
                     GLES20.GL_FLOAT, false,
@@ -333,6 +380,7 @@ public class Points implements Constants {
 
         // Disable vertex array
         GLES20.glDisableVertexAttribArray(mPositionHandle);
+        GLES20.glDisableVertexAttribArray(mVertexColorHandle);
     }
 
     public static float getRadius() {

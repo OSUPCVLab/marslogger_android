@@ -43,18 +43,19 @@ Repeat with the setting off to confirm no ARCore CSV is created.
 
 On the LiDAR capture screen, the red LiDAR odometry line and cyan aligned ARCore line
 are drawn over the sliding-window point cloud in the LiDAR mapping frame. The app
-uses the CAD `L_T_C` pose in `ArCoreLidarAlignment`, matches one LiDAR and ARCore pose
-within 75 ms, and then keeps `Wl_T_Wc` fixed for that ARCore world origin. The status
-label shows whether alignment is waiting or initialized. Each initialized transform,
-its matched timestamps, and the CAD extrinsic are saved to
-`arcore_lidar_alignment.txt` in the recording session. A new ARCore world origin
-requires a new one-time match. If pose timestamps do not match a fresh Android clock,
-alignment waits rather than drawing an unregistered path. The LiDAR line assumes
+uses the CAD `L_T_C` pose for an optical camera frame (+X right, +Y down, +Z toward
+the scene). ARCore `Camera.getPose()` uses +X right, +Y up, and -Z toward the scene,
+so the alignment first rotates the camera frame 180 degrees about X. It calibrates
+the LiDAR sensor clock against Android receipt timestamps, matches a LiDAR and ARCore
+pose within 20 ms, and then keeps `Wl_T_Wc` fixed for that ARCore world origin.
+The status label shows whether alignment is waiting or initialized. Each initialized
+transform, its matched timestamps, and both camera-frame extrinsics are saved to
+`alignment.yaml` and `arcore_lidar_alignment.txt` in the recording session. A new
+ARCore world origin requires a new one-time match. The LiDAR line assumes
 `/Odometry` and `/cloud_registered` use the same mapping frame, and that the
-`/Odometry` child pose is the LiDAR frame `L`. The CAD camera frame must match the
-frame returned by ARCore camera pose. The display keeps up to 4,096 positions per
+`/Odometry` child pose is the LiDAR frame `L`. The display keeps up to 4,096 positions per
 path at approximately 5 cm spacing; recording files are unchanged apart from the
-new alignment log.
+alignment metadata.
 
 # Performance benchmark files
 
