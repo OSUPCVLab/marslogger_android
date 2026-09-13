@@ -5,7 +5,10 @@ import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.Surface;
+import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.preference.PreferenceManager;
@@ -43,6 +46,9 @@ public final class ArCoreRecorder {
     private int textureId;
     private long lastTimestampNs;
     private int worldOriginId;
+    private volatile TextView statusView;
+    private long lastStatusUpdateNs;
+    private TrackingState lastStatusState;
 
     public ArCoreRecorder(Activity activity) {
         this.activity = activity;
@@ -51,6 +57,22 @@ public final class ArCoreRecorder {
     public static boolean isEnabled(Activity activity) {
         return PreferenceManager.getDefaultSharedPreferences(activity)
                 .getBoolean(PREFERENCE_KEY, false);
+    }
+
+    /** Shows live tracking only on capture screens that opt in to this view. */
+    public void setStatusView(TextView view) {
+        synchronized (lock) {
+            statusView = view;
+            lastStatusUpdateNs = 0;
+            lastStatusState = null;
+        }
+        if (view != null) {
+            boolean enabled = isEnabled(activity);
+            view.setVisibility(enabled ? View.VISIBLE : View.GONE);
+            if (enabled) {
+                view.setText("ARCore: starting");
+            }
+        }
     }
 
     /** Called before Camera2 opens the device. A failure leaves ordinary Camera2 usable. */
@@ -68,17 +90,30 @@ public final class ArCoreRecorder {
             }
             Session candidate = null;
             try {
-                ArCoreApk.Availability availability = ArCoreApk.getInstance().checkAvailability(activity);
-                if (availability != ArCoreApk.Availability.SUPPORTED_INSTALLED) {
-                    report("ARCore is unavailable or not installed on this device");
+                ArCoreApk.Availability availability =
+                        ArCoreApk.getInstance().checkAvailability(activity);
+                Timber.d("ARCORE Availability = %s", availability);
+                if (availability == ArCoreApk.Availability.UNKNOWN_CHECKING) {
+                    report("Checking ARCore availability");
+                    return false;
+                }
+                if (!availability.isSupported()) {
+                    report("ARCore is not supported on this device");
                     return false;
                 }
                 if (ArCoreApk.getInstance().requestInstall(activity, false)
                         != ArCoreApk.InstallStatus.INSTALLED) {
-                    report("ARCore installation is incomplete");
+                    report("ARCore installation required");
                     return false;
                 }
-                candidate = new Session(activity, EnumSet.of(Session.Feature.SHARED_CAMERA));
+                Timber.d("Creating ARCore shared camera session");
+                candidate = new Session(activity,
+                        EnumSet.of(Session.Feature.SHARED_CAMERA));
+
+                Timber.d("ARCore session created");
+
+
+
                 String arCameraId = candidate.getCameraConfig().getCameraId();
                 if (!cameraId.equals(arCameraId)) {
                     closeAsync(candidate);
@@ -143,6 +178,8 @@ public final class ArCoreRecorder {
                 session.resume();
                 sharedCamera.setCaptureCallback(callback, handler);
                 active = true;
+                lastStatusState = null;
+                postStatus("ARCore: waiting for tracking");
             } catch (Exception error) {
                 Timber.w(error, "ARCore resume failed");
                 report("ARCore tracking failed to start; Camera2 recording will continue");
@@ -241,13 +278,18 @@ public final class ArCoreRecorder {
                 // This is the Camera2 SENSOR_TIMESTAMP, unlike Frame.getTimestamp() whose
                 // clock domain is not specified by ARCore.
                 long timestampNs = frame.getAndroidCameraTimestamp();
-                if (writer == null || timestampNs <= 0 || timestampNs == lastTimestampNs) {
+                if (timestampNs <= 0 || (writer != null && timestampNs == lastTimestampNs)) {
+                    return;
+                }
+                com.google.ar.core.Camera camera = frame.getCamera();
+                TrackingState state = camera.getTrackingState();
+                Pose pose = state == TrackingState.TRACKING || writer != null
+                        ? camera.getPose() : null;
+                updateStatus(state, pose);
+                if (writer == null) {
                     return;
                 }
                 lastTimestampNs = timestampNs;
-                com.google.ar.core.Camera camera = frame.getCamera();
-                TrackingState state = camera.getTrackingState();
-                Pose pose = camera.getPose();
                 float[] translation = pose.getTranslation();
                 float[] rotation = pose.getRotationQuaternion();
                 CameraIntrinsics intrinsics = camera.getImageIntrinsics();
@@ -277,6 +319,9 @@ public final class ArCoreRecorder {
         Session oldSession;
         synchronized (lock) {
             oldSession = session;
+            if (active) {
+                postStatus("ARCore: paused");
+            }
             if (oldSession != null) {
                 try {
                     oldSession.pause();
@@ -287,6 +332,7 @@ public final class ArCoreRecorder {
             session = null;
             sharedCamera = null;
             active = false;
+            lastStatusState = null;
         }
         if (oldSession != null) {
             closeAsync(oldSession);
@@ -309,7 +355,39 @@ public final class ArCoreRecorder {
 
     private void report(String message) {
         Timber.w(message);
+        postStatus("ARCore: " + message);
         new Handler(Looper.getMainLooper()).post(() ->
                 Toast.makeText(activity, message, Toast.LENGTH_LONG).show());
+    }
+
+    private void updateStatus(TrackingState state, Pose pose) {
+        if (statusView == null) {
+            return;
+        }
+        long nowNs = SystemClock.elapsedRealtimeNanos();
+        if (state == lastStatusState && nowNs - lastStatusUpdateNs < 200_000_000L) {
+            return;
+        }
+        lastStatusState = state;
+        lastStatusUpdateNs = nowNs;
+        if (state == TrackingState.TRACKING && pose != null) {
+            float[] position = pose.getTranslation();
+            postStatus(String.format(Locale.US,
+                    "ARCore: TRACKING\nx %.2f  y %.2f  z %.2f m",
+                    position[0], position[1], position[2]));
+        } else {
+            postStatus("ARCore: " + state.name());
+        }
+    }
+
+    private void postStatus(String status) {
+        TextView view = statusView;
+        if (view != null) {
+            view.post(() -> {
+                if (statusView == view) {
+                    view.setText(status);
+                }
+            });
+        }
     }
 }

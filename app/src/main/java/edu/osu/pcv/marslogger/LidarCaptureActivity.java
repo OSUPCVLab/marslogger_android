@@ -533,6 +533,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         }
         mCameraCapture.mKeyCameraParamsText = (TextView) findViewById(R.id.cameraParams_text);
         mCameraCapture.mCaptureResultText = (TextView) findViewById(R.id.captureResult_text);
+        mCameraCapture.mArCoreRecorder.setStatusView((TextView) findViewById(R.id.arcoreStatus_text));
         mOutputDirText = (TextView) findViewById(R.id.cameraOutputDir_text);
     }
 

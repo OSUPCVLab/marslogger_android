@@ -63,11 +63,21 @@
         android:text="focal length : exposure time" />
 
     <TextView
-        android:id="@+id/cameraOutputDirLabel"
+        android:id="@+id/arcoreStatus_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignStart="@id/cameraParams_text"
         android:layout_below="@id/captureResult_text"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/cameraOutputDirLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@id/cameraParams_text"
+        android:layout_below="@id/arcoreStatus_text"
         android:text="@string/cameraOutputDirLabel_text" />
 
     <TextView
