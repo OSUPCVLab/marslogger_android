@@ -41,6 +41,30 @@ After stopping, confirm `arcore_poses.csv` has rows with increasing timestamps a
 and that the usual video, Camera2 metadata, and IMU files are still present.
 Repeat with the setting off to confirm no ARCore CSV is created.
 
+On the LiDAR capture screen, the red LiDAR odometry line and cyan aligned ARCore line
+are drawn over the sliding-window point cloud in the LiDAR mapping frame. The app
+uses the CAD `L_T_C` pose in `ArCoreLidarAlignment`, matches one LiDAR and ARCore pose
+within 75 ms, and then keeps `Wl_T_Wc` fixed for that ARCore world origin. The status
+label shows whether alignment is waiting or initialized. Each initialized transform,
+its matched timestamps, and the CAD extrinsic are saved to
+`arcore_lidar_alignment.txt` in the recording session. A new ARCore world origin
+requires a new one-time match. If pose timestamps do not match a fresh Android clock,
+alignment waits rather than drawing an unregistered path. The LiDAR line assumes
+`/Odometry` and `/cloud_registered` use the same mapping frame, and that the
+`/Odometry` child pose is the LiDAR frame `L`. The CAD camera frame must match the
+frame returned by ARCore camera pose. The display keeps up to 4,096 positions per
+path at approximately 5 cm spacing; recording files are unchanged apart from the
+new alignment log.
+
+# Performance benchmark files
+
+Enable **Benchmark logging** in Settings before starting a recording. Each new camera
+or LiDAR recording then writes `benchmark/pipeline_perf_*.csv` and
+`benchmark/device_stats_*.csv` inside that recording's session directory. Stopping
+the recording stops benchmark logging. Exporting the session includes these files.
+Benchmark files from older app versions in the former shared `benchmarks` directory
+remain there and are not attached to a recording automatically.
+
 # Export recording data
 
 After stopping a recording, open Settings and tap **Export Recording Data**.

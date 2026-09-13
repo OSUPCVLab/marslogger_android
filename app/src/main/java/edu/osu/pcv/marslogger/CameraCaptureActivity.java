@@ -57,6 +57,7 @@ import javax.microedition.khronos.opengles.GL10;
 
 import edu.osu.pcv.marslogger.gles.FullFrameRect;
 import edu.osu.pcv.marslogger.gles.Texture2dProgram;
+import edu.osu.pcv.marslogger.benchmark.BenchmarkSessionManager;
 import timber.log.Timber;
 
 /**
@@ -266,6 +267,9 @@ public class CameraCaptureActivity extends Activity
     protected void onDestroy() {
         Timber.d("onDestroy");
         mCameraCapture.mArCoreRecorder.stopRecording();
+        if (mCurrentRecordingDir != null) {
+            BenchmarkSessionManager.getInstance(this).stop();
+        }
         super.onDestroy();
         mCameraHandler.invalidateHandler();     // paranoia
     }
@@ -293,6 +297,9 @@ public class CameraCaptureActivity extends Activity
             String outputDir = mCameraCapture.renewOutputDir();
             mCurrentRecordingDir = outputDir;
             RecordingExportManager.markRecordingStarted(outputDir);
+            if (mSharedPreferences.getBoolean("prefBenchmarkEnabled", false)) {
+                BenchmarkSessionManager.getInstance(this).start(new File(outputDir));
+            }
             String outputFile = outputDir + File.separator + "movie.mp4";
             String metaFile = outputDir + File.separator + "frame_timestamps.txt";
             String basename = outputDir.substring(outputDir.lastIndexOf("/")+1);
@@ -309,6 +316,7 @@ public class CameraCaptureActivity extends Activity
                     outputDir + File.separator + "movie_metadata.csv");
             mCameraCapture.mArCoreRecorder.startRecording(outputDir);
         } else {
+            BenchmarkSessionManager.getInstance(this).stop();
             mCameraCapture.mArCoreRecorder.stopRecording();
             mCameraCapture.mCamera2Proxy.stopRecordingCaptureResult();
             mImuManager.stopRecording();

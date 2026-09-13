@@ -353,6 +353,15 @@ public class Points implements Constants {
             return -1;
     }
 
+    /** The same scale and offset used for rendering the current point cloud. */
+    public float[] getDisplayTransform() {
+        double[] offset = isSetOrigin ? sc.getCenterOfMass() : null;
+        return new float[]{scaleFactor,
+                offset == null ? 0f : (float) offset[0],
+                offset == null ? 0f : (float) offset[1],
+                offset == null ? 0f : (float) offset[2]};
+    }
+
     public static void setRadiusScale(float scale) {
         radiusScale = scale;
     }

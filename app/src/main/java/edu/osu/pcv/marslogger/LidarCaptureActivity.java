@@ -26,6 +26,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 
+import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.location.Criteria;
@@ -34,6 +35,7 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.preference.PreferenceManager;
@@ -72,11 +74,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 import sensor_msgs.PointCloud2;
 import sg.edu.nus.comp.android3dvisualisationtool.app.openGLES20Support.GLES20SurfaceView;
@@ -122,6 +126,10 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     public static final String TAG = "MarsLogger";
     private CameraCapture mCameraCapture;
     private GLES20SurfaceView mPCGLView;
+    private TextView mArCoreAlignmentStatus;
+    private ArCoreLidarAlignment mTrajectoryAlignment;
+    private final AtomicLong mLastAlignmentWarningNs = new AtomicLong();
+    private volatile boolean mArCoreAlignmentEnabled;
     private TextView mOutputDirText;
 
     private CameraHandler mCameraHandler;
@@ -523,6 +531,82 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         // https://www.dre.vanderbilt.edu/~schmidt/android/android-4.0/out/target/common/docs/doc-comment-check/resources/articles/glsurfaceview.html
         mPCGLView = (GLES20SurfaceView) findViewById(R.id.gl_surface_view);
         mPCGLView.setPerformanceLogger(mBenchmarkSessionManager.getPipelineLogger());
+        mArCoreAlignmentStatus = findViewById(R.id.arcoreAlignmentStatus_text);
+        mArCoreAlignmentEnabled = ArCoreRecorder.isEnabled(this);
+        if (mTrajectoryAlignment == null) {
+            mTrajectoryAlignment = new ArCoreLidarAlignment(new ArCoreLidarAlignment.Listener() {
+                @Override
+                public void onAlignmentReset(long generation) {
+                    runOnUiThread(() -> {
+                        if (!isDestroyed()
+                                && mTrajectoryAlignment.isCurrentGeneration(generation)) {
+                            mPCGLView.clearArCoreTrajectory();
+                            showAlignmentWaiting();
+                        }
+                    });
+                }
+
+                @Override
+                public void onAligned(ArCoreLidarAlignment.Match match) {
+                    String matrix = Arrays.toString(
+                            match.worldLidarFromWorldCamera.matrixRowMajor());
+                    Log.i(TAG, String.format(Locale.US,
+                            "ARCore-LiDAR aligned origin=%d lidar_timestamp_ns=%d "
+                                    + "camera_timestamp_ns=%d lidar_boot_ns=%d camera_boot_ns=%d "
+                                    + "difference_ns=%d Wl_T_Wc=%s",
+                            match.originId, match.lidarTimestampNs, match.cameraTimestampNs,
+                            match.lidarBootTimestampNs, match.cameraBootTimestampNs,
+                            match.differenceNs, matrix));
+                    runOnUiThread(() -> {
+                        if (!isDestroyed()
+                                && mTrajectoryAlignment.isCurrentGeneration(match.generation)) {
+                            mArCoreAlignmentStatus.setText(String.format(Locale.US,
+                                    "ARCore aligned (%.0f ms)",
+                                    match.differenceNs / 1_000_000.0));
+                            mArCoreAlignmentStatus.setVisibility(View.VISIBLE);
+                            writeAlignmentLog(match, matrix);
+                        }
+                    });
+                }
+
+                @Override
+                public void onTransformedPose(long generation, int originId, long timestampNs,
+                        ArCoreLidarAlignment.RigidTransform pose) {
+                    Log.d(TAG, String.format(Locale.US,
+                            "ARCore in LiDAR world timestamp_ns=%d origin=%d "
+                                    + "tx=%.6f ty=%.6f tz=%.6f qx=%.6f qy=%.6f qz=%.6f qw=%.6f",
+                            timestampNs, originId, pose.x, pose.y, pose.z,
+                            pose.qx, pose.qy, pose.qz, pose.qw));
+                    GLES20SurfaceView pointCloudView = mPCGLView;
+                    if (pointCloudView != null) {
+                        pointCloudView.post(() -> {
+                            if (!isDestroyed()
+                                    && mTrajectoryAlignment.isCurrentGeneration(generation)) {
+                                pointCloudView.appendAlignedArCorePosition(originId,
+                                        (float) pose.x, (float) pose.y, (float) pose.z);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+        showAlignmentWaiting();
+        mCameraCapture.mArCoreRecorder.setPoseListener((originId, timestampNs,
+                x, y, z, qx, qy, qz, qw) -> {
+            long bootTimestampNs = normalizeCameraTimestamp(timestampNs);
+            if (bootTimestampNs == Long.MIN_VALUE) {
+                reportAlignmentInputProblem("ARCore timestamp has no matching Android clock",
+                        timestampNs);
+                return;
+            }
+            try {
+                mTrajectoryAlignment.addCamera(originId, timestampNs, bootTimestampNs,
+                        new ArCoreLidarAlignment.RigidTransform(
+                                x, y, z, qx, qy, qz, qw));
+            } catch (IllegalArgumentException error) {
+                reportAlignmentInputProblem("ARCore pose has an invalid rotation", timestampNs);
+            }
+        });
 
         if (mGpsManager == null) {
             mGpsManager = new GPSManager(this);
@@ -604,7 +688,11 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
     @Override
     protected void onDestroy() {
         Timber.d("onDestroy");
+        mCameraCapture.mArCoreRecorder.setPoseListener(null);
         mCameraCapture.mArCoreRecorder.stopRecording();
+        if (mCurrentRecordingDir != null) {
+            mBenchmarkSessionManager.stop();
+        }
         nativeLifecycleExecutor.shutdown();
         if (nodeMainExecutor != null) {
             nodeMainExecutor.shutdown();
@@ -622,6 +710,11 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
             String outputDir = mCameraCapture.renewOutputDir();
             mCurrentRecordingDir = outputDir;
             RecordingExportManager.markRecordingStarted(outputDir);
+            mPCGLView.clearTrajectories();
+            mTrajectoryAlignment.reset();
+            if (mSharedPreferences.getBoolean("prefBenchmarkEnabled", false)) {
+                mBenchmarkSessionManager.start(new File(outputDir));
+            }
             String outputFile = outputDir + File.separator + "movie.mp4";
             String timeFile = outputDir + File.separator + "frame_timestamps.txt";
             String basename = outputDir.substring(outputDir.lastIndexOf("/")+1);
@@ -643,6 +736,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
             startLaserLogging2(outputDir + File.separator + "lidar.bag");
             rosListenerNode.setRecording(true);
         } else {
+            mBenchmarkSessionManager.stop();
             mCameraCapture.mArCoreRecorder.stopRecording();
             mCameraCapture.mCamera2Proxy.stopRecordingCaptureResult();
             stopGnssRtkRecording();
@@ -1136,6 +1230,66 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         }
     }
 
+    private static long normalizePoseTimestamp(long timestampNs) {
+        return ArCoreLidarAlignment.normalizeToBootTime(timestampNs,
+                SystemClock.elapsedRealtimeNanos(), System.nanoTime(),
+                System.currentTimeMillis() * 1_000_000L);
+    }
+
+    private long normalizeCameraTimestamp(long timestampNs) {
+        Integer source = mCameraCapture.mCamera2Proxy == null ? null
+                : mCameraCapture.mCamera2Proxy.getmTimeSourceValue();
+        if (source != null
+                && source == CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME) {
+            long ageNs = Math.abs(SystemClock.elapsedRealtimeNanos() - timestampNs);
+            return timestampNs > 0 && ageNs <= 5_000_000_000L
+                    ? timestampNs : Long.MIN_VALUE;
+        }
+        return normalizePoseTimestamp(timestampNs);
+    }
+
+    private void reportAlignmentInputProblem(String problem, long timestampNs) {
+        long nowNs = SystemClock.elapsedRealtimeNanos();
+        long lastNs = mLastAlignmentWarningNs.get();
+        if ((lastNs == 0 || nowNs - lastNs >= 5_000_000_000L)
+                && mLastAlignmentWarningNs.compareAndSet(lastNs, nowNs)) {
+            Timber.w("%s: timestamp_ns=%d", problem, timestampNs);
+            if (mArCoreAlignmentEnabled) {
+                runOnUiThread(() -> {
+                    if (!isDestroyed() && !mTrajectoryAlignment.isAligned()) {
+                        mArCoreAlignmentStatus.setText("ARCore alignment: timestamp/pose issue");
+                    }
+                });
+            }
+        }
+    }
+
+    private void showAlignmentWaiting() {
+        mArCoreAlignmentStatus.setText("ARCore alignment: waiting");
+        mArCoreAlignmentStatus.setVisibility(
+                mArCoreAlignmentEnabled ? View.VISIBLE : View.GONE);
+    }
+
+    private void writeAlignmentLog(ArCoreLidarAlignment.Match match, String matrix) {
+        if (mCurrentRecordingDir == null) {
+            return;
+        }
+        File logFile = new File(mCurrentRecordingDir, "arcore_lidar_alignment.txt");
+        try (BufferedWriter out = new BufferedWriter(new FileWriter(logFile, true))) {
+            out.write(String.format(Locale.US,
+                    "world_origin_id=%d lidar_timestamp_ns=%d camera_timestamp_ns=%d "
+                            + "lidar_boot_ns=%d camera_boot_ns=%d difference_ns=%d%n",
+                    match.originId, match.lidarTimestampNs, match.cameraTimestampNs,
+                    match.lidarBootTimestampNs, match.cameraBootTimestampNs,
+                    match.differenceNs));
+            out.write("L_T_C_row_major="
+                    + Arrays.toString(ArCoreLidarAlignment.L_T_C.matrixRowMajor()) + "\n");
+            out.write("Wl_T_Wc_row_major=" + matrix + "\n");
+        } catch (IOException error) {
+            Timber.w(error, "Could not save ARCore-LiDAR alignment");
+        }
+    }
+
     private void startRosListener() {
         Log.i(TAG, "Starting ros listener node...");
         NodeConfiguration nodeConfiguration = NodeConfiguration.newPublic(hostName);
@@ -1148,7 +1302,26 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
         rosListenerNode.setOnLocationUpdateListener(
                 new LocationUpdateListener() {
                     @Override
-                    public void onLocationUpdate(double x, double y, double z) {
+                    public void onLocationUpdate(long timestampNs, double x, double y, double z,
+                            double qx, double qy, double qz, double qw) {
+                        mPCGLView.appendLidarPosition((float) x, (float) y, (float) z);
+                        if (mArCoreAlignmentEnabled) {
+                            long bootTimestampNs = normalizePoseTimestamp(timestampNs);
+                            if (bootTimestampNs != Long.MIN_VALUE) {
+                                try {
+                                    mTrajectoryAlignment.addLidar(timestampNs, bootTimestampNs,
+                                            new ArCoreLidarAlignment.RigidTransform(
+                                                    x, y, z, qx, qy, qz, qw));
+                                } catch (IllegalArgumentException error) {
+                                    reportAlignmentInputProblem(
+                                            "LiDAR odometry has an invalid rotation", timestampNs);
+                                }
+                            } else {
+                                reportAlignmentInputProblem(
+                                        "LiDAR odometry timestamp has no matching Android clock",
+                                        timestampNs);
+                            }
+                        }
                         runOnUiThread(
                                 new Runnable() {
                                     @Override

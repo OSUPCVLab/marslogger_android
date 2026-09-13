@@ -12,8 +12,8 @@ import java.util.ArrayList;
 
 import edu.osu.pcv.marslogger.benchmark.PipelinePerformanceLogger;
 import geometry_msgs.Point;
+import geometry_msgs.Quaternion;
 import nav_msgs.Odometry;
-import nav_msgs.Path;
 import sensor_msgs.PointCloud2;
 
 public class RosListenerNode extends AbstractNodeMain {
@@ -24,6 +24,7 @@ public class RosListenerNode extends AbstractNodeMain {
     private Subscriber<PointCloud2> livox_pc_subscriber;
     private Subscriber<PointCloud2> pandar_pc_subscriber;
     private Subscriber<PointCloud2> lio_pc_subscriber;
+    private boolean odometryFramesLogged;
     private int pc_count = 0;
     private boolean recording = false;
     private volatile PipelinePerformanceLogger performanceLogger;
@@ -80,9 +81,19 @@ public class RosListenerNode extends AbstractNodeMain {
         odom_subscriber.addMessageListener(new MessageListener<Odometry>() {
             @Override
             public void onNewMessage(Odometry msg) {
+                if (!odometryFramesLogged) {
+                    Log.i(TAG, "Odometry frame_id=" + msg.getHeader().getFrameId()
+                            + " child_frame_id=" + msg.getChildFrameId());
+                    odometryFramesLogged = true;
+                }
                 Point point = msg.getPose().getPose().getPosition();
+                Quaternion rotation = msg.getPose().getPose().getOrientation();
+                long timestampNs = msg.getHeader().getStamp() == null ? 0
+                        : msg.getHeader().getStamp().totalNsecs();
                 for (LocationUpdateListener listener : odom_listeners) {
-                    listener.onLocationUpdate(point.getX(), point.getY(), point.getZ());
+                    listener.onLocationUpdate(timestampNs,
+                            point.getX(), point.getY(), point.getZ(),
+                            rotation.getX(), rotation.getY(), rotation.getZ(), rotation.getW());
                 }
             }
         });

@@ -119,7 +119,7 @@
         <SwitchPreference
             android:key="prefBenchmarkEnabled"
             android:title="Benchmark logging"
-            android:summary="Off. No performance files are written."
+            android:summary="Write performance CSVs to each recording's benchmark folder"
             android:defaultValue="false" />
     </PreferenceCategory>
 

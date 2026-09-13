@@ -36,6 +36,12 @@ import timber.log.Timber;
 public final class ArCoreRecorder {
     public static final String PREFERENCE_KEY = "prefArCoreRecording";
 
+    public interface PoseListener {
+        void onTrackingPose(int worldOriginId, long timestampNs,
+                            float x, float y, float z,
+                            float qx, float qy, float qz, float qw);
+    }
+
     private final Activity activity;
     private final Object lock = new Object();
     private Session session;
@@ -49,6 +55,8 @@ public final class ArCoreRecorder {
     private volatile TextView statusView;
     private long lastStatusUpdateNs;
     private TrackingState lastStatusState;
+    private volatile PoseListener poseListener;
+    private long lastPoseNotificationNs;
 
     public ArCoreRecorder(Activity activity) {
         this.activity = activity;
@@ -73,6 +81,10 @@ public final class ArCoreRecorder {
                 view.setText("ARCore: starting");
             }
         }
+    }
+
+    public void setPoseListener(PoseListener listener) {
+        poseListener = listener;
     }
 
     /** Called before Camera2 opens the device. A failure leaves ordinary Camera2 usable. */
@@ -131,6 +143,7 @@ public final class ArCoreRecorder {
                 }
                 worldOriginId++;
                 lastTimestampNs = 0;
+                lastPoseNotificationNs = 0;
                 if (pendingOutputDir != null && writer == null) {
                     openWriter(pendingOutputDir);
                 }
@@ -286,6 +299,22 @@ public final class ArCoreRecorder {
                 Pose pose = state == TrackingState.TRACKING || writer != null
                         ? camera.getPose() : null;
                 updateStatus(state, pose);
+                PoseListener listener = poseListener;
+                if (listener != null && state == TrackingState.TRACKING && pose != null
+                        && (lastPoseNotificationNs == 0
+                        || timestampNs - lastPoseNotificationNs >= 100_000_000L)) {
+                    float[] position = pose.getTranslation();
+                    float[] quaternion = pose.getRotationQuaternion();
+                    lastPoseNotificationNs = timestampNs;
+                    try {
+                        listener.onTrackingPose(worldOriginId, timestampNs,
+                                position[0], position[1], position[2],
+                                quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
+                    } catch (RuntimeException error) {
+                        Timber.w(error, "ARCore trajectory display failed");
+                        poseListener = null;
+                    }
+                }
                 if (writer == null) {
                     return;
                 }

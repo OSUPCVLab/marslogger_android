@@ -179,4 +179,29 @@
         android:layout_toEndOf="@id/gnssRtkLabel"
         android:paddingStart="4dp"
         android:text="" />
+
+    <TextView
+        android:id="@+id/lidarTrajectoryLegend_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:layout_margin="4dp"
+        android:background="#99000000"
+        android:padding="4dp"
+        android:text="LiDAR trajectory"
+        android:textColor="#FF5A50" />
+
+    <TextView
+        android:id="@+id/arcoreAlignmentStatus_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="4dp"
+        android:background="#99000000"
+        android:padding="4dp"
+        android:text="ARCore alignment: waiting"
+        android:textColor="#40E7FF"
+        android:visibility="gone" />
 </merge>

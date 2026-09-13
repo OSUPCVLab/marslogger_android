@@ -63,7 +63,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import timber.log.Timber;
-import edu.osu.pcv.marslogger.benchmark.BenchmarkSession;
 import edu.osu.pcv.marslogger.benchmark.BenchmarkSessionManager;
 
 /**
@@ -165,19 +164,10 @@ public class SettingsFragment extends PreferenceFragmentCompat
         });
 
         Preference benchmarkPreference = findPreference("prefBenchmarkEnabled");
-        BenchmarkSessionManager benchmarkManager =
-                BenchmarkSessionManager.getInstance(requireContext());
-        updateBenchmarkSummary(benchmarkPreference, benchmarkManager);
         benchmarkPreference.setOnPreferenceChangeListener((preference, newValue) -> {
-            if ((Boolean) newValue) {
-                BenchmarkSession session = benchmarkManager.start();
-                Toast.makeText(requireContext(), "Benchmark started: " + session.sessionId,
-                        Toast.LENGTH_SHORT).show();
-            } else {
-                benchmarkManager.stop();
-                Toast.makeText(requireContext(), "Benchmark stopped", Toast.LENGTH_SHORT).show();
+            if (!(Boolean) newValue) {
+                BenchmarkSessionManager.getInstance(requireContext()).stop();
             }
-            updateBenchmarkSummary(preference, benchmarkManager);
             return true;
         });
 
@@ -525,17 +515,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
         } else {
             Toast.makeText(appContext, title + ": " + message, Toast.LENGTH_LONG).show();
         }
-    }
-
-    private void updateBenchmarkSummary(Preference preference,
-                                        BenchmarkSessionManager manager) {
-        if (preference == null) {
-            return;
-        }
-        BenchmarkSession session = manager.getActiveSession();
-        preference.setSummary(session == null
-                ? "Off. No performance files are written."
-                : "Running session " + session.sessionId);
     }
 
     /**

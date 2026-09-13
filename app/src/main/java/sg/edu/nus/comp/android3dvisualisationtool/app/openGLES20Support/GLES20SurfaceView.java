@@ -48,6 +48,28 @@ public class GLES20SurfaceView extends GLSurfaceView implements Constants {
         mRenderer.appendPoints(points);
     }
 
+    public void appendLidarPosition(float x, float y, float z) {
+        if (mRenderer.appendLidarPosition(x, y, z)) {
+            requestRender();
+        }
+    }
+
+    public void appendAlignedArCorePosition(int originId, float x, float y, float z) {
+        if (mRenderer.appendAlignedArCorePosition(originId, x, y, z)) {
+            requestRender();
+        }
+    }
+
+    public void clearArCoreTrajectory() {
+        mRenderer.clearArCoreTrajectory();
+        requestRender();
+    }
+
+    public void clearTrajectories() {
+        mRenderer.clearTrajectories();
+        requestRender();
+    }
+
     public void setPerformanceLogger(PipelinePerformanceLogger logger) {
         mRenderer.setPerformanceLogger(logger);
     }

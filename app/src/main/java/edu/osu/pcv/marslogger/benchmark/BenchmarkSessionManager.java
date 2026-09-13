@@ -12,7 +12,6 @@ import java.util.UUID;
 public final class BenchmarkSessionManager {
     private static volatile BenchmarkSessionManager instance;
 
-    private final File outputDirectory;
     private final MonotonicClock clock;
     private final PipelinePerformanceLogger pipelineLogger;
     private final DeviceStatsLogger deviceStatsLogger;
@@ -24,10 +23,7 @@ public final class BenchmarkSessionManager {
             synchronized (BenchmarkSessionManager.class) {
                 if (instance == null) {
                     Context appContext = context.getApplicationContext();
-                    File externalFiles = appContext.getExternalFilesDir(null);
-                    File base = new File(externalFiles == null ? appContext.getFilesDir()
-                            : externalFiles, "benchmarks");
-                    instance = new BenchmarkSessionManager(base, MonotonicClock.SYSTEM,
+                    instance = new BenchmarkSessionManager(MonotonicClock.SYSTEM,
                             new PipelinePerformanceLogger(), new DeviceStatsLogger(appContext));
                 }
             }
@@ -35,25 +31,28 @@ public final class BenchmarkSessionManager {
         return instance;
     }
 
-    BenchmarkSessionManager(File outputDirectory, MonotonicClock clock,
+    BenchmarkSessionManager(MonotonicClock clock,
                             PipelinePerformanceLogger pipelineLogger,
                             DeviceStatsLogger deviceStatsLogger) {
-        this.outputDirectory = outputDirectory;
         this.clock = clock;
         this.pipelineLogger = pipelineLogger;
         this.deviceStatsLogger = deviceStatsLogger;
     }
 
-    public synchronized BenchmarkSession start() {
+    public synchronized BenchmarkSession start(File recordingDirectory) {
+        File benchmarkDirectory = new File(recordingDirectory, "benchmark");
         if (activeSession != null) {
-            return activeSession;
+            if (benchmarkDirectory.equals(activeSession.pipelineFile.getParentFile())) {
+                return activeSession;
+            }
+            stop();
         }
         String sessionId = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
                 .format(new Date()) + "_" + UUID.randomUUID().toString().substring(0, 8);
         long startNs = clock.nowNanos();
         BenchmarkSession session = new BenchmarkSession(sessionId, startNs,
-                new File(outputDirectory, "pipeline_perf_" + sessionId + ".csv"),
-                new File(outputDirectory, "device_stats_" + sessionId + ".csv"));
+                new File(benchmarkDirectory, "pipeline_perf_" + sessionId + ".csv"),
+                new File(benchmarkDirectory, "device_stats_" + sessionId + ".csv"));
         activeSession = session;
         lastSession = session;
         pipelineLogger.start(session);

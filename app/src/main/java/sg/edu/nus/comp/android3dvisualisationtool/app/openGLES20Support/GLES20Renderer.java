@@ -24,6 +24,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     private static final String TAG = "GLES20Renderer";
     private Points mPoints;
     private final Object lock = new Object();
+    private final TrajectoryOverlay trajectories = new TrajectoryOverlay();
 //    private final AtomicReference<Points> mPoints = new AtomicReference<>();
     private VirtualSphere vs = new VirtualSphere();
     private android.graphics.Point cueCenter = new android.graphics.Point();
@@ -53,6 +54,30 @@ public class GLES20Renderer extends GLRenderer implements Constants {
 
     public void setPerformanceLogger(PipelinePerformanceLogger logger) {
         performanceLogger = logger;
+    }
+
+    public boolean appendLidarPosition(float x, float y, float z) {
+        synchronized (lock) {
+            return trajectories.appendLidar(x, y, z);
+        }
+    }
+
+    public boolean appendAlignedArCorePosition(int originId, float x, float y, float z) {
+        synchronized (lock) {
+            return trajectories.appendArCore(originId, x, y, z);
+        }
+    }
+
+    public void clearArCoreTrajectory() {
+        synchronized (lock) {
+            trajectories.clearArCore();
+        }
+    }
+
+    public void clearTrajectories() {
+        synchronized (lock) {
+            trajectories.clear();
+        }
     }
 
     public void appendPoints(List<Point> points) {
@@ -98,6 +123,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
     public void onCreate(int width, int height, boolean isContextLost) {
         if (isContextLost) {
             // context is lost, we need to recreate everything
+            trajectories.onContextCreated();
 
             // Set the background frame color
             GLES20.glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
@@ -161,6 +187,7 @@ public class GLES20Renderer extends GLRenderer implements Constants {
 
         synchronized (lock) {
             mPoints.draw(scratch, windowWidth);
+            trajectories.draw(scratch, mPoints.getDisplayTransform());
         }
 
         if (NavigationDrawerFragment.getShowAxes()) {
