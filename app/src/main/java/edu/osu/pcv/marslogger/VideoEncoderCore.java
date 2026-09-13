@@ -66,8 +66,8 @@ public class VideoEncoderCore {
         public long upTimeNanos;
         public TimePair(Long sensorTime) {
             sensorTimeMicros = sensorTime;
-            unixTimeNanos = TimeHelper.bootTimeToUnixTime(sensorTimeMicros * 1000);
-            upTimeNanos = TimeHelper.bootTimeToUpTime(sensorTimeMicros * 1000);
+            unixTimeNanos = TimeHelper.monotonicToUnixTime(sensorTimeMicros * 1000);
+            upTimeNanos = sensorTimeMicros * 1000;
         }
         public String toString() {
             String delimiter = ",";

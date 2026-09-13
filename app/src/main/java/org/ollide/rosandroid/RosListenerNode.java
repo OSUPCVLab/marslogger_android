@@ -1,6 +1,7 @@
 package org.ollide.rosandroid;
 
 import android.util.Log;
+import android.os.SystemClock;
 
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
@@ -26,7 +27,9 @@ public class RosListenerNode extends AbstractNodeMain {
     private Subscriber<PointCloud2> lio_pc_subscriber;
     private boolean odometryFramesLogged;
     private int pc_count = 0;
-    private boolean recording = false;
+    private volatile boolean recording = false;
+    private volatile RawPCListener rawPCListener;
+    private volatile RawTimestampListener rawTimestampListener;
     private volatile PipelinePerformanceLogger performanceLogger;
     ArrayList<LocationUpdateListener> odom_listeners = new ArrayList<LocationUpdateListener>();
     ArrayList<FrameNumberListener> livox_pc_listeners = new ArrayList<FrameNumberListener>();
@@ -49,6 +52,14 @@ public class RosListenerNode extends AbstractNodeMain {
         this.world_pc_listeners.add(listener);
     }
 
+    public void setOnRawPCListener(RawPCListener listener) {
+        rawPCListener = listener;
+    }
+
+    public void setOnRawTimestampListener(RawTimestampListener listener) {
+        rawTimestampListener = listener;
+    }
+
     public void setRecording(boolean record) {
         if (record) {
             pc_count = 0;
@@ -60,11 +71,16 @@ public class RosListenerNode extends AbstractNodeMain {
         this.performanceLogger = performanceLogger;
     }
 
-    private void recordRawFrame(PointCloud2 msg) {
+    private void recordRawFrame(PointCloud2 msg, boolean livox) {
+        long hostBootReceiveNs = SystemClock.elapsedRealtimeNanos();
+        long sensorTimestampNs = msg.getHeader().getStamp().totalNsecs();
+        RawTimestampListener clockListener = rawTimestampListener;
+        if (clockListener != null) {
+            clockListener.onRawTimestamp(livox, sensorTimestampNs, hostBootReceiveNs);
+        }
         PipelinePerformanceLogger logger = performanceLogger;
         if (logger != null && logger.isActive()) {
             long frameId = ((long) msg.getHeader().getSeq()) & 0xffffffffL;
-            long sensorTimestampNs = msg.getHeader().getStamp().totalNsecs();
             int pointCount = msg.getHeight() * msg.getWidth();
             logger.onRawFrameReceived(frameId, sensorTimestampNs, pointCount);
         }
@@ -101,9 +117,11 @@ public class RosListenerNode extends AbstractNodeMain {
         livox_pc_subscriber.addMessageListener(new MessageListener<PointCloud2>() {
            @Override
            public void onNewMessage(PointCloud2 msg) {
-               recordRawFrame(msg);
+               recordRawFrame(msg, true);
                if (!recording)
                    return;
+               RawPCListener rawListener = rawPCListener;
+               if (rawListener != null) rawListener.onRawPC(msg);
                pc_count++;
                if (pc_count % 20 == 0) {
                    for (FrameNumberListener listener : livox_pc_listeners) {
@@ -116,9 +134,11 @@ public class RosListenerNode extends AbstractNodeMain {
         pandar_pc_subscriber.addMessageListener(new MessageListener<PointCloud2>() {
             @Override
             public void onNewMessage(PointCloud2 msg) {
-                recordRawFrame(msg);
+                recordRawFrame(msg, false);
                 if (!recording)
                     return;
+                RawPCListener rawListener = rawPCListener;
+                if (rawListener != null) rawListener.onRawPC(msg);
                 pc_count++;
                 if (pc_count % 20 == 0) {
                     for (FrameNumberListener listener : livox_pc_listeners) {

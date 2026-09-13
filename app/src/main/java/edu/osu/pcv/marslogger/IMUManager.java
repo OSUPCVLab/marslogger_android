@@ -29,7 +29,7 @@ public class IMUManager implements SensorEventListener {
     private final long mInterpolationTimeResolution = 500; // nanoseconds
     private int mSensorRate = SensorManager.SENSOR_DELAY_FASTEST;
 
-    public static String ImuHeader = "sensor uptime[sec],gx[rad/s],gy[rad/s],gz[rad/s]," +
+    public static String ImuHeader = "sensor_timestamp_monotonic[sec],gx[rad/s],gy[rad/s],gz[rad/s]," +
             "ax[m/s^2],ay[m/s^2],az[m/s^2],mx[uT],my[uT],mz[uT],host unix time[sec]\n";
 
     private class SensorPacket {
@@ -235,8 +235,8 @@ public class IMUManager implements SensorEventListener {
 
     @Override
     public final void onSensorChanged(SensorEvent event) {
-        long upTimeNanos = TimeHelper.bootTimeToUpTime(event.timestamp);
-        long unixTimeNanos = TimeHelper.bootTimeToUnixTime(event.timestamp);
+        long upTimeNanos = event.timestamp;
+        long unixTimeNanos = TimeHelper.monotonicToUnixTime(event.timestamp);
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             SensorPacket sp = new SensorPacket(upTimeNanos, unixTimeNanos, event.values);
             mAccelData.add(sp);

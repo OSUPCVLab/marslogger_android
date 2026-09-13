@@ -1,20 +1,27 @@
 package edu.osu.pcv.marslogger;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
 
 /** One-time alignment of ARCore camera poses to the LiDAR mapping world. */
 final class ArCoreLidarAlignment {
-    static final long MAX_MATCH_DELTA_NS = 75_000_000L;
-    private static final long MAX_CLOCK_AGE_NS = 5_000_000_000L;
+    static final long DEFAULT_MAX_MATCH_DELTA_NS = 20_000_000L;
     private static final int MAX_PENDING_POSES = 64;
 
-    // CAD T_lidar_camera = [tx, ty, tz, qx, qy, qz, qw], in metres.
+    // CAD camera is optical: +X right, +Y down, +Z toward the scene.
+    // T_lidar_camera = [tx, ty, tz, qx, qy, qz, qw], in metres.
     static final RigidTransform L_T_C = new RigidTransform(
             0.09165818567908458, 0.024371359183858687, -0.07761523102914086,
             -0.006557708581064656, -0.5943650948131397,
             0.8041392764010252, 0.006866926180545729);
-    private static final RigidTransform C_T_L = L_T_C.inverse();
+    // ARCore Camera.getPose() is OpenGL: +X right, +Y up, -Z toward the scene.
+    // This is a proper 180-degree rotation about X, not an X/Y permutation.
+    static final RigidTransform ARCORE_T_OPTICAL = new RigidTransform(
+            0, 0, 0, 1, 0, 0, 0);
+    static final RigidTransform L_T_C_ARCORE = L_T_C.multiply(ARCORE_T_OPTICAL.inverse());
+    private static final RigidTransform C_ARCORE_T_L = L_T_C_ARCORE.inverse();
 
     interface Listener {
         void onAlignmentReset(long generation);
@@ -28,45 +35,57 @@ final class ArCoreLidarAlignment {
         final int originId;
         final long lidarTimestampNs;
         final long cameraTimestampNs;
-        final long lidarBootTimestampNs;
-        final long cameraBootTimestampNs;
+        final long lidarUnixTimestampNs;
+        final long cameraUnixTimestampNs;
         final long differenceNs;
+        final long matchedPosePairs;
         final RigidTransform worldLidarFromWorldCamera;
 
         Match(long generation, int originId, StampedPose lidar, StampedPose camera,
-              RigidTransform worldLidarFromWorldCamera) {
+              RigidTransform worldLidarFromWorldCamera, long matchedPosePairs) {
             this.generation = generation;
             this.originId = originId;
             lidarTimestampNs = lidar.timestampNs;
             cameraTimestampNs = camera.timestampNs;
-            lidarBootTimestampNs = lidar.bootTimestampNs;
-            cameraBootTimestampNs = camera.bootTimestampNs;
-            differenceNs = Math.abs(lidar.bootTimestampNs - camera.bootTimestampNs);
+            lidarUnixTimestampNs = lidar.unixTimestampNs;
+            cameraUnixTimestampNs = camera.unixTimestampNs;
+            differenceNs = Math.abs(lidar.unixTimestampNs - camera.unixTimestampNs);
+            this.matchedPosePairs = matchedPosePairs;
             this.worldLidarFromWorldCamera = worldLidarFromWorldCamera;
         }
     }
 
     private static final class StampedPose {
         final long timestampNs;
-        final long bootTimestampNs;
+        final long unixTimestampNs;
         final RigidTransform pose;
 
-        StampedPose(long timestampNs, long bootTimestampNs, RigidTransform pose) {
+        StampedPose(long timestampNs, long unixTimestampNs, RigidTransform pose) {
             this.timestampNs = timestampNs;
-            this.bootTimestampNs = bootTimestampNs;
+            this.unixTimestampNs = unixTimestampNs;
             this.pose = pose;
         }
     }
 
     private final Listener listener;
+    private final long maxMatchDeltaNs;
     private final Deque<StampedPose> lidarPending = new ArrayDeque<>();
     private final Deque<StampedPose> cameraPending = new ArrayDeque<>();
     private RigidTransform worldLidarFromWorldCamera;
     private int originId = Integer.MIN_VALUE;
     private long generation;
+    private long matchedPosePairs;
 
     ArCoreLidarAlignment(Listener listener) {
+        this(listener, DEFAULT_MAX_MATCH_DELTA_NS);
+    }
+
+    ArCoreLidarAlignment(Listener listener, long maxMatchDeltaNs) {
+        if (maxMatchDeltaNs <= 0) {
+            throw new IllegalArgumentException("Maximum pose time difference must be positive");
+        }
         this.listener = listener;
+        this.maxMatchDeltaNs = maxMatchDeltaNs;
     }
 
     synchronized void reset() {
@@ -83,15 +102,20 @@ final class ArCoreLidarAlignment {
         return generation == candidate;
     }
 
-    synchronized void addLidar(long timestampNs, long bootTimestampNs, RigidTransform pose) {
-        if (bootTimestampNs == Long.MIN_VALUE || worldLidarFromWorldCamera != null) {
-            return;
-        }
-        addPending(lidarPending, new StampedPose(timestampNs, bootTimestampNs, pose));
-        tryInitialize();
+    synchronized long getMatchedPosePairs() {
+        return matchedPosePairs;
     }
 
-    synchronized void addCamera(int newOriginId, long timestampNs, long bootTimestampNs,
+    synchronized void addLidar(long timestampNs, long unixTimestampNs, RigidTransform pose) {
+        if (unixTimestampNs == Long.MIN_VALUE) {
+            return;
+        }
+        addPending(lidarPending, new StampedPose(timestampNs, unixTimestampNs, pose));
+        if (worldLidarFromWorldCamera == null) tryInitialize();
+        else countMaturedPairs();
+    }
+
+    synchronized void addCamera(int newOriginId, long timestampNs, long unixTimestampNs,
                                 RigidTransform pose) {
         if (newOriginId != originId) {
             if (originId != Integer.MIN_VALUE) {
@@ -100,20 +124,22 @@ final class ArCoreLidarAlignment {
             }
             originId = newOriginId;
         }
-        if (bootTimestampNs == Long.MIN_VALUE) {
+        if (unixTimestampNs == Long.MIN_VALUE) {
             return;
         }
+        addPending(cameraPending, new StampedPose(timestampNs, unixTimestampNs, pose));
         if (worldLidarFromWorldCamera != null) {
+            countMaturedPairs();
             listener.onTransformedPose(generation, originId, timestampNs, transform(pose));
             return;
         }
-        addPending(cameraPending, new StampedPose(timestampNs, bootTimestampNs, pose));
         tryInitialize();
     }
 
     private void resetInternal() {
         generation++;
         worldLidarFromWorldCamera = null;
+        matchedPosePairs = 0;
         lidarPending.clear();
         cameraPending.clear();
     }
@@ -121,36 +147,63 @@ final class ArCoreLidarAlignment {
     private void tryInitialize() {
         StampedPose matchedLidar = null;
         StampedPose matchedCamera = null;
-        long bestDifference = MAX_MATCH_DELTA_NS + 1;
-        for (StampedPose lidar : lidarPending) {
-            for (StampedPose camera : cameraPending) {
-                long difference = Math.abs(lidar.bootTimestampNs - camera.bootTimestampNs);
-                if (difference < bestDifference) {
-                    bestDifference = difference;
-                    matchedLidar = lidar;
-                    matchedCamera = camera;
-                }
+        for (StampedPose camera : cameraPending) {
+            if (!isMatured(camera)) break;
+            StampedPose nearest = nearestLidar(camera.unixTimestampNs);
+            if (nearest != null && Math.abs(nearest.unixTimestampNs
+                    - camera.unixTimestampNs) <= maxMatchDeltaNs) {
+                matchedLidar = nearest;
+                matchedCamera = camera;
+                break;
             }
         }
-        if (matchedLidar == null || bestDifference > MAX_MATCH_DELTA_NS) {
-            return;
-        }
-        // Wl_T_Wc = Wl_T_L(t0) * L_T_C * inverse(Wc_T_C(t0)).
-        worldLidarFromWorldCamera = matchedLidar.pose.multiply(L_T_C)
+        if (matchedLidar == null) return;
+        // Wl_T_Wc = Wl_T_L(t0) * L_T_C_arcore * inverse(Wc_T_C_arcore(t0)).
+        worldLidarFromWorldCamera = matchedLidar.pose.multiply(L_T_C_ARCORE)
                 .multiply(matchedCamera.pose.inverse());
+        List<StampedPose> bufferedCameras = new ArrayList<>(cameraPending);
+        countMaturedPairs();
         listener.onAligned(new Match(generation, originId, matchedLidar, matchedCamera,
-                worldLidarFromWorldCamera));
-        for (StampedPose camera : cameraPending) {
+                worldLidarFromWorldCamera, matchedPosePairs));
+        for (StampedPose camera : bufferedCameras) {
             listener.onTransformedPose(generation, originId,
                     camera.timestampNs, transform(camera.pose));
         }
-        lidarPending.clear();
-        cameraPending.clear();
+    }
+
+    private boolean isMatured(StampedPose camera) {
+        return !lidarPending.isEmpty()
+                && lidarPending.getLast().unixTimestampNs >= camera.unixTimestampNs
+                + maxMatchDeltaNs;
+    }
+
+    private StampedPose nearestLidar(long cameraUnixNs) {
+        StampedPose nearest = null;
+        long bestDelta = Long.MAX_VALUE;
+        for (StampedPose lidar : lidarPending) {
+            long delta = Math.abs(lidar.unixTimestampNs - cameraUnixNs);
+            if (delta < bestDelta) {
+                nearest = lidar;
+                bestDelta = delta;
+            }
+        }
+        return nearest;
+    }
+
+    private void countMaturedPairs() {
+        while (!cameraPending.isEmpty() && isMatured(cameraPending.getFirst())) {
+            StampedPose camera = cameraPending.removeFirst();
+            StampedPose nearest = nearestLidar(camera.unixTimestampNs);
+            if (nearest != null && Math.abs(nearest.unixTimestampNs
+                    - camera.unixTimestampNs) <= maxMatchDeltaNs) {
+                matchedPosePairs++;
+            }
+        }
     }
 
     private RigidTransform transform(RigidTransform cameraPose) {
-        // Wl_T_L_arcore(t) = Wl_T_Wc * Wc_T_C(t) * C_T_L.
-        return worldLidarFromWorldCamera.multiply(cameraPose).multiply(C_T_L);
+        // Wl_T_L_arcore(t) = Wl_T_Wc * Wc_T_C_arcore(t) * C_arcore_T_L.
+        return worldLidarFromWorldCamera.multiply(cameraPose).multiply(C_ARCORE_T_L);
     }
 
     private static void addPending(Deque<StampedPose> pending, StampedPose pose) {
@@ -160,26 +213,6 @@ final class ArCoreLidarAlignment {
         pending.addLast(pose);
     }
 
-    /** Normalize a fresh Android/ROS stamp to elapsedRealtimeNanos; reject unknown clocks. */
-    static long normalizeToBootTime(long timestampNs, long bootNowNs,
-                                    long monotonicNowNs, long unixNowNs) {
-        if (timestampNs <= 0) {
-            return Long.MIN_VALUE;
-        }
-        long bootAge = Math.abs(timestampNs - bootNowNs);
-        long monotonicAge = Math.abs(timestampNs - monotonicNowNs);
-        long unixAge = Math.abs(timestampNs - unixNowNs);
-        long nearestAge = Math.min(bootAge, Math.min(monotonicAge, unixAge));
-        if (nearestAge > MAX_CLOCK_AGE_NS) {
-            return Long.MIN_VALUE;
-        }
-        if (bootAge == nearestAge) {
-            return timestampNs;
-        }
-        return timestampNs + bootNowNs - (monotonicAge == nearestAge
-                ? monotonicNowNs : unixNowNs);
-    }
-
     static final class RigidTransform {
         final double x, y, z;
         final double qx, qy, qz, qw;
@@ -187,7 +220,8 @@ final class ArCoreLidarAlignment {
         RigidTransform(double x, double y, double z,
                        double qx, double qy, double qz, double qw) {
             double norm = Math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
-            if (!(norm > 0) || !Double.isFinite(norm)) {
+            if (!(norm > 0) || !Double.isFinite(norm)
+                    || !Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
                 throw new IllegalArgumentException("Invalid pose quaternion");
             }
             this.x = x;

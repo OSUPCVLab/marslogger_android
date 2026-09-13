@@ -214,7 +214,7 @@ public final class ArCoreRecorder {
     private void openWriter(String outputDir) {
         try {
             writer = new BufferedWriter(new FileWriter(new File(outputDir, "arcore_poses.csv")));
-            writer.write("timestamp_ns,world_origin_id,tracking_state,tx_m,ty_m,tz_m,"
+            writer.write("camera_timestamp_monotonic_ns,world_origin_id,tracking_state,tx_m,ty_m,tz_m,"
                     + "qx,qy,qz,qw,fx_px,fy_px,cx_px,cy_px,image_width,image_height\n");
             lastTimestampNs = 0;
         } catch (IOException error) {

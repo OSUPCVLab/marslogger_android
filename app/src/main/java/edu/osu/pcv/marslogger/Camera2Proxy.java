@@ -187,7 +187,7 @@ public class Camera2Proxy {
             }
             mFrameMetadataWriter = new BufferedWriter(
                     new FileWriter(captureResultFile, true));
-            String header = "sensor uptime[sec],fx[px],fy[px],Frame No.," +
+            String header = "sensor_timestamp_monotonic[sec],fx[px],fy[px],Frame No.," +
                     "Exposure time[nanosec],Sensor frame duration[nanosec]," +
                     "Frame readout time[nanosec]," +
                     "ISO,Focal length,Focus distance,AF mode, host unix time[sec]";
@@ -757,9 +757,10 @@ public class Camera2Proxy {
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                        @NonNull CaptureRequest request,
                                        @NonNull TotalCaptureResult result) {
-            Long bootTimeNanos = result.get(CaptureResult.SENSOR_TIMESTAMP);
-            long unixTimeNanos = TimeHelper.bootTimeToUnixTime(bootTimeNanos);
-            long upTimeNanos = TimeHelper.bootTimeToUpTime(bootTimeNanos);
+            Long sensorTimestampNanos =
+                    result.get(CaptureResult.SENSOR_TIMESTAMP);
+            long upTimeNanos = sensorTimestampNanos;
+            long unixTimeNanos = TimeHelper.monotonicToUnixTime(sensorTimestampNanos);
             final long kSecToNano = 1000000000;
             process(result);
 
