@@ -6,6 +6,9 @@ import android.util.Log;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import timber.log.Timber;
 
@@ -15,38 +18,75 @@ public class TimeBaseManager {
     public String mTimeBaseHint;
     
     private BufferedWriter mDataWriter = null;
+    private ScheduledExecutorService mCheckpointExecutor;
 
     public TimeBaseManager() {
 
     }
     
-    public void startRecording(String captureResultFile, Integer timeSourceValue) {
+    public synchronized void startRecording(String captureResultFile, Integer timeSourceValue) {
+        if (mDataWriter != null) {
+            stopRecording();
+        }
         mDataWriter = FileHelper.createBufferedWriter(captureResultFile);
-        long sysElapsedNs = SystemClock.elapsedRealtimeNanos();
-        long sysNs = System.nanoTime();
-        long diff = sysElapsedNs - sysNs;
+        if (mDataWriter == null) {
+            return;
+        }
         setCameraTimestampSource(timeSourceValue);
         try {
             mDataWriter.write(mTimeBaseHint + "\n");
             mDataWriter.write("#IMU data clock\tSENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN camera clock\tDifference\n");
             mDataWriter.write("#elapsedRealtimeNanos()\tnanoTime()\tDifference\n");
-            mDataWriter.write(sysElapsedNs + "\t" + sysNs + "\t" + diff + "\n");
+            writeCheckpoint();
         } catch (IOException ioe) {
-            Timber.e(ioe);
+            Timber.e(ioe, "Could not write timebase header.");
+            FileHelper.closeBufferedWriter(mDataWriter);
+            mDataWriter = null;
+            return;
         }
+        mCheckpointExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "timebase-checkpoint");
+            thread.setPriority(Thread.MIN_PRIORITY);
+            return thread;
+        });
+        mCheckpointExecutor.scheduleAtFixedRate(this::writePeriodicCheckpoint,
+                60, 60, TimeUnit.SECONDS);
     }
 
-    public void stopRecording() {
-        long sysElapsedNs = SystemClock.elapsedRealtimeNanos();
-        long sysNs = System.nanoTime();
-        long diff = sysElapsedNs - sysNs;
+    public synchronized void stopRecording() {
+        if (mCheckpointExecutor != null) {
+            mCheckpointExecutor.shutdownNow();
+            mCheckpointExecutor = null;
+        }
+        if (mDataWriter == null) {
+            return;
+        }
         try {
-            mDataWriter.write(sysElapsedNs + "\t" + sysNs + "\t" + diff + "\n");
+            writeCheckpoint();
         } catch (IOException ioe) {
-            Timber.e(ioe);
+            Timber.e(ioe, "Could not write final timebase checkpoint.");
         }
         FileHelper.closeBufferedWriter(mDataWriter);
         mDataWriter = null;
+    }
+
+    private synchronized void writePeriodicCheckpoint() {
+        if (mDataWriter == null) {
+            return;
+        }
+        try {
+            writeCheckpoint();
+        } catch (IOException ioe) {
+            Timber.e(ioe, "Could not write timebase checkpoint.");
+        }
+    }
+
+    private void writeCheckpoint() throws IOException {
+        long sysElapsedNs = SystemClock.elapsedRealtimeNanos();
+        long sysNs = System.nanoTime();
+        long diff = sysElapsedNs - sysNs;
+        mDataWriter.write(sysElapsedNs + "\t" + sysNs + "\t" + diff + "\n");
+        mDataWriter.flush();
     }
 
     private void createHeader(String timestampSource) {
@@ -65,7 +105,7 @@ public class TimeBaseManager {
                 "is really small, e.g., <1000 nanoseconds.\n#" +
                 "To help sync camera frames to " +
                 "the IMU offline, the timestamps" +
-                " according to the two time basis at the start and end" +
+                " according to the two time basis at the start, periodically, and end" +
                 " of a recording session are recorded.";
     }
 

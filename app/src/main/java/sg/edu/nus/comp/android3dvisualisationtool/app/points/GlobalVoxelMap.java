@@ -17,12 +17,8 @@ public final class GlobalVoxelMap {
         return globalMap.size();
     }
 
-    public void addPoint(float x, float y, float z, Pose pose) {
-        if (pose == null || !Float.isFinite(x) || !Float.isFinite(y)
-                || !Float.isFinite(z)) return;
-        double wx = pose.tx + pose.r00 * x + pose.r01 * y + pose.r02 * z;
-        double wy = pose.ty + pose.r10 * x + pose.r11 * y + pose.r12 * z;
-        double wz = pose.tz + pose.r20 * x + pose.r21 * y + pose.r22 * z;
+    /** Registered scans already use the mapping frame. */
+    public void addWorldPoint(double wx, double wy, double wz) {
         if (!Double.isFinite(wx) || !Double.isFinite(wy) || !Double.isFinite(wz)) return;
         VoxelKey key = new VoxelKey((int) Math.floor(wx / VOXEL_SIZE_M),
                 (int) Math.floor(wy / VOXEL_SIZE_M),
@@ -89,29 +85,4 @@ public final class GlobalVoxelMap {
         }
     }
 
-    /** Current Wl_T_L pose, with quaternion normalized once per odometry message. */
-    public static final class Pose {
-        final double tx, ty, tz;
-        final double r00, r01, r02, r10, r11, r12, r20, r21, r22;
-
-        public Pose(double tx, double ty, double tz,
-                double qx, double qy, double qz, double qw) {
-            double norm = Math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
-            if (!Double.isFinite(norm) || norm < 1e-12
-                    || !Double.isFinite(tx) || !Double.isFinite(ty) || !Double.isFinite(tz)) {
-                throw new IllegalArgumentException("Invalid LiDAR pose");
-            }
-            qx /= norm; qy /= norm; qz /= norm; qw /= norm;
-            this.tx = tx; this.ty = ty; this.tz = tz;
-            r00 = 1 - 2 * (qy * qy + qz * qz);
-            r01 = 2 * (qx * qy - qz * qw);
-            r02 = 2 * (qx * qz + qy * qw);
-            r10 = 2 * (qx * qy + qz * qw);
-            r11 = 1 - 2 * (qx * qx + qz * qz);
-            r12 = 2 * (qy * qz - qx * qw);
-            r20 = 2 * (qx * qz - qy * qw);
-            r21 = 2 * (qy * qz + qx * qw);
-            r22 = 1 - 2 * (qx * qx + qy * qy);
-        }
-    }
 }

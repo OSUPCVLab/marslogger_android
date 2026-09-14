@@ -19,7 +19,16 @@ import sg.edu.nus.comp.android3dvisualisationtool.app.openGLES20Support.GLES20Re
  */
 public class Points implements Constants {
 
-    private static String vertexShaderCode;
+    private static final String vertexShaderCode =
+            "uniform mat4 uMVPMatrix;" +
+                    "uniform float uPointSize;" +
+                    "attribute vec4 vPosition;" +
+                    "attribute vec4 aColor; varying vec4 vColor;" +
+                    "void main() {" +
+                    "  gl_Position = uMVPMatrix * vPosition;" +
+                    "  gl_PointSize = uPointSize;" +
+                    "  vColor = aColor;" +
+                    "}";
 
     private static final String fragmentShaderCode =
             "precision mediump float;" +
@@ -36,6 +45,7 @@ public class Points implements Constants {
     private static int mProgram;
     private static int mPositionHandle;
     private static int mMVPMatrixHandle;
+    private static int mPointSizeHandle;
     private static float radius;
     private static float scaleFactor;
     private static float curvature;
@@ -222,72 +232,49 @@ public class Points implements Constants {
         GLES20.glAttachShader(mProgram, vertexShader);   // add the vertex shader to program
         GLES20.glAttachShader(mProgram, fragmentShader); // add the fragment shader to program
         GLES20.glLinkProgram(mProgram);                  // create OpenGL program executables
+        GLES20.glDeleteShader(vertexShader);
+        GLES20.glDeleteShader(fragmentShader);
+    }
+
+    /** GL object names from a lost context must not be reused in the new one. */
+    public static void onContextCreated() {
+        mProgram = 0;
     }
 
     private void initBuffer() {
-        // initialize vertex byte buffer for shape coordinates
-        ByteBuffer bb = ByteBuffer.allocateDirect(
-                // (number of coordinate values * 4 bytes per float)
-                pointCoords.length * 4);
-        // use the device hardware's native byte order
-        bb.order(ByteOrder.nativeOrder());
-
-        // create a floating point buffer from the ByteBuffer
-        vertexBuffer = bb.asFloatBuffer();
-        // add the coordinates to the FloatBuffer
-        vertexBuffer.put(pointCoords);
-        // set the buffer to read the first coordinate
-        vertexBuffer.position(0);
-
-        bb = ByteBuffer.allocateDirect(colorCoords.length * 4);
-        bb.order(ByteOrder.nativeOrder());
-        colorBuffer = bb.asFloatBuffer();
-        colorBuffer.put(colorCoords);
-        colorBuffer.position(0);
+        vertexBuffer = writeDirectBuffer(vertexBuffer, pointCoords);
+        colorBuffer = writeDirectBuffer(colorBuffer, colorCoords);
 
         if (isNormalVectorVisible && isPointContainsNormalVector) {
-            bb = ByteBuffer.allocateDirect(lineCoords.length * 4);
-            bb.order(ByteOrder.nativeOrder());
-            lineBuffer = bb.asFloatBuffer();
-            lineBuffer.put(lineCoords);
-            lineBuffer.position(0);
+            lineBuffer = writeDirectBuffer(lineBuffer, lineCoords);
         }
 
         if (isShowingCurvature) {
-            bb = ByteBuffer.allocateDirect(curvaturePointCoords.length * 4);
-            bb.order(ByteOrder.nativeOrder());
-            curvatureBuffer = bb.asFloatBuffer();
-            curvatureBuffer.put(curvaturePointCoords);
-            curvatureBuffer.position(0);
+            curvatureBuffer = writeDirectBuffer(curvatureBuffer, curvaturePointCoords);
         }
+    }
 
+    private static FloatBuffer writeDirectBuffer(FloatBuffer buffer, float[] values) {
+        if (buffer == null || buffer.capacity() < values.length) {
+            buffer = ByteBuffer.allocateDirect(values.length * Float.BYTES)
+                    .order(ByteOrder.nativeOrder()).asFloatBuffer();
+        }
+        buffer.clear();
+        buffer.put(values);
+        buffer.flip();
+        return buffer;
     }
 
     private void preSetup() {
-        updateRadiusProgram();
         generateCoordsArray();
         generateColorCoords(pointsList);
         initBuffer();
-        prepareProgram();
-    }
-
-    private void updateRadiusProgram() {
-        vertexShaderCode =
-                "uniform mat4 uMVPMatrix;" +
-                        "attribute vec4 vPosition;" +
-                        "attribute vec4 aColor; varying vec4 vColor;" +
-                        "void main() {" +
-                        "  gl_Position = uMVPMatrix * vPosition;" +
-                        "  gl_PointSize = " + radius + ";" +
-                        "  vColor = aColor;" +
-                        "}";
     }
 
     private void setupShowCurvature() {
         if (isShowingCurvature) {
             generateCurvatureCoordsArray();
             initBuffer();
-            prepareProgram();
         } else {
             preSetup();
         }
@@ -317,12 +304,13 @@ public class Points implements Constants {
 
         if (radius != (float) (radiusScale * sc.getRadius() * displayWidth / DEFAULT_MAX_ABS_COORIDINATE)) {
             radius = (float) (radiusScale * sc.getRadius() * displayWidth / DEFAULT_MAX_ABS_COORIDINATE);
-            updateRadiusProgram();
-            setupShowCurvature();
         }
 
         // Add program to OpenGL environment
+        if (mProgram == 0) prepareProgram();
         GLES20.glUseProgram(mProgram);
+        mPointSizeHandle = GLES20.glGetUniformLocation(mProgram, "uPointSize");
+        GLES20.glUniform1f(mPointSizeHandle, radius);
 
         // get handle to vertex shader's vPosition member
         mPositionHandle = GLES20.glGetAttribLocation(mProgram, "vPosition");

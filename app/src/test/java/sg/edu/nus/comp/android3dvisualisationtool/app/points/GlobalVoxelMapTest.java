@@ -5,14 +5,11 @@ import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
 public class GlobalVoxelMapTest {
-    private static final GlobalVoxelMap.Pose IDENTITY =
-            new GlobalVoxelMap.Pose(0, 0, 0, 0, 0, 0, 1);
-
     @Test
     public void accumulatesCentroidAndCountWithoutRetainingPoints() {
         GlobalVoxelMap map = new GlobalVoxelMap();
-        map.addPoint(0.02f, 0.03f, 0.04f, IDENTITY);
-        map.addPoint(0.10f, 0.05f, 0.12f, IDENTITY);
+        map.addWorldPoint(0.02, 0.03, 0.04);
+        map.addWorldPoint(0.10, 0.05, 0.12);
 
         assertEquals(1, map.size());
         float[] centroid = map.snapshotCentroids();
@@ -22,25 +19,22 @@ public class GlobalVoxelMapTest {
     }
 
     @Test
-    public void negativeCoordinatesUseFloorAndPoseRotatesIntoWorld() {
+    public void registeredCoordinatesUseWorldVoxelsWithoutAnotherTransform() {
         GlobalVoxelMap map = new GlobalVoxelMap();
-        map.addPoint(-0.01f, 0f, 0f, IDENTITY);
-        map.addPoint(0.01f, 0f, 0f, IDENTITY);
+        map.addWorldPoint(-0.01, 0, 0);
+        map.addWorldPoint(0.01, 0, 0);
         assertEquals(2, map.size());
 
         map.clear();
-        map.addPoint(0.99f, 0f, 0f, IDENTITY);
-        map.addPoint(1.00f, 0f, 0f, IDENTITY);
+        map.addWorldPoint(0.99, 0, 0);
+        map.addWorldPoint(1.00, 0, 0);
         assertEquals(2, map.size());
 
         map.clear();
-        // 90 degrees about Z: local +X becomes world +Y, then add translation.
-        double half = Math.sqrt(0.5);
-        GlobalVoxelMap.Pose pose = new GlobalVoxelMap.Pose(1, 2, 3, 0, 0, half, half);
-        map.addPoint(1f, 0f, 0f, pose);
+        map.addWorldPoint(1, 2, 3);
         float[] xyz = map.snapshotCentroids();
         assertEquals(1f, xyz[0], 1e-6);
-        assertEquals(3f, xyz[1], 1e-6);
+        assertEquals(2f, xyz[1], 1e-6);
         assertEquals(3f, xyz[2], 1e-6);
     }
 }

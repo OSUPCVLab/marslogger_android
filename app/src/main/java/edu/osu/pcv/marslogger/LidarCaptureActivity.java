@@ -94,7 +94,6 @@ import org.ollide.rosandroid.RecordSignalNode;
 import org.ollide.rosandroid.LocationUpdateListener;
 import org.ollide.rosandroid.FrameNumberListener;
 import org.ollide.rosandroid.PCConverter;
-import org.ollide.rosandroid.RawPCListener;
 import org.ollide.rosandroid.RawTimestampListener;
 import org.ollide.rosandroid.WorldPCListener;
 import org.ollide.rosandroid.RosListenerNode;
@@ -1378,7 +1377,6 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
                     public void onLocationUpdate(long timestampNs, double x, double y, double z,
                             double qx, double qy, double qz, double qw) {
                         mPCGLView.appendLidarPosition((float) x, (float) y, (float) z);
-                        mPCGLView.setLidarPose(x, y, z, qx, qy, qz, qw);
                         if (mArCoreAlignmentEnabled) {
                             PoseTimestampConverter clocks = mPoseTimestampConverter;
                             if (!clocks.hasLidarCalibration()) {
@@ -1445,6 +1443,7 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
                             frameId, sensorTimestampNs);
                 }
                 List<Point> points = PCConverter.toPointList(msg);
+                mPCGLView.appendRegisteredPoints(points);
                 if (timing != null) {
                     performanceLogger.onPreprocessingComplete(timing, points.size());
                 }
@@ -1455,14 +1454,6 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
                 mPCGLView.requestRender();
             }
         });
-        // global point cloud map aggregated from point cloud frames.
-        rosListenerNode.setOnRawPCListener(new RawPCListener() {
-            @Override
-            public void onRawPC(PointCloud2 msg) {
-                mPCGLView.appendRawCloud(msg);
-            }
-        });
-
         nodeMainExecutor.execute(rosListenerNode, nodeConfiguration);
     }
 

@@ -10,7 +10,6 @@ import android.view.ScaleGestureDetector;
 import java.util.List;
 
 import edu.osu.pcv.marslogger.benchmark.PipelinePerformanceLogger;
-import sensor_msgs.PointCloud2;
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.NavigationDrawerFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.UI.SliderFragment;
 import sg.edu.nus.comp.android3dvisualisationtool.app.configuration.Constants;
@@ -76,13 +75,8 @@ public class GLES20SurfaceView extends GLSurfaceView implements Constants {
         requestRender();
     }
 
-    public void setLidarPose(double x, double y, double z,
-            double qx, double qy, double qz, double qw) {
-        mRenderer.setLidarPose(x, y, z, qx, qy, qz, qw);
-    }
-
-    public void appendRawCloud(PointCloud2 msg) {
-        if (mRenderer.appendRawCloud(msg)) requestRender();
+    public void appendRegisteredPoints(List<Point> points) {
+        mRenderer.appendRegisteredPoints(points);
     }
 
     public void flushGlobalMap() {

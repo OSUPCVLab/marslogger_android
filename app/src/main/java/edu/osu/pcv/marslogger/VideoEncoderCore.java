@@ -27,7 +27,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 
 import timber.log.Timber;
 
@@ -80,7 +79,7 @@ public class VideoEncoderCore {
         }
     }
 
-    private ArrayList<TimePair> mTimeArray = null;
+    private int mFrameTimesSinceFlush;
     final int TIMEOUT_USEC = 10000;
 
     /**
@@ -133,10 +132,19 @@ public class VideoEncoderCore {
         try {
             mFrameTimeWriter = new BufferedWriter(
                     new FileWriter(timeFile, false));
+            mFrameTimeWriter.write(FrameTimeHeader);
+            mFrameTimeWriter.flush();
         } catch (IOException err) {
-            Timber.e(err, "IOException in opening frameMetadataWriter.");
+            Timber.e(err, "Could not initialize frame timestamp file.");
+            if (mFrameTimeWriter != null) {
+                try {
+                    mFrameTimeWriter.close();
+                } catch (IOException closeError) {
+                    Timber.e(closeError, "Could not close frame timestamp file.");
+                }
+            }
+            mFrameTimeWriter = null;
         }
-        mTimeArray = new ArrayList<>();
     }
 
     /**
@@ -165,14 +173,32 @@ public class VideoEncoderCore {
         }
         if (mFrameTimeWriter != null) {
             try {
-                mFrameTimeWriter.write(FrameTimeHeader);
-                for (TimePair value : mTimeArray) {
-                    mFrameTimeWriter.write(value.toString() + "\n");
-                }
-                mFrameTimeWriter.flush();
                 mFrameTimeWriter.close();
             } catch (IOException err) {
-                Timber.e(err, "IOException in closing frameMetadataWriter.");
+                Timber.e(err, "Could not close frame timestamp file.");
+            }
+            mFrameTimeWriter = null;
+        }
+    }
+
+    private void recordFrameTime(long presentationTimeUs) {
+        if (mFrameTimeWriter == null) {
+            return;
+        }
+        try {
+            mFrameTimeWriter.write(new TimePair(presentationTimeUs).toString());
+            mFrameTimeWriter.newLine();
+            // Persist roughly once per second at the configured 30 fps.
+            if (++mFrameTimesSinceFlush >= FRAME_RATE) {
+                mFrameTimeWriter.flush();
+                mFrameTimesSinceFlush = 0;
+            }
+        } catch (IOException err) {
+            Timber.e(err, "Could not write frame timestamp.");
+            try {
+                mFrameTimeWriter.close();
+            } catch (IOException closeError) {
+                Timber.e(closeError, "Could not close frame timestamp file.");
             }
             mFrameTimeWriter = null;
         }
@@ -244,8 +270,8 @@ public class VideoEncoderCore {
                     // adjust the ByteBuffer values to match BufferInfo (not needed?)
                     encodedData.position(mBufferInfo.offset);
                     encodedData.limit(mBufferInfo.offset + mBufferInfo.size);
-                    mTimeArray.add(new TimePair(mBufferInfo.presentationTimeUs));
                     mMuxer.writeSampleData(mTrackIndex, encodedData, mBufferInfo);
+                    recordFrameTime(mBufferInfo.presentationTimeUs);
                     if (VERBOSE) {
                         Timber.d("sent %d bytes to muxer, ts=%d",
                                 mBufferInfo.size, mBufferInfo.presentationTimeUs);

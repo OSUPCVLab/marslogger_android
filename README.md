@@ -56,6 +56,8 @@ ARCore world origin requires a new one-time match. The LiDAR line assumes
 `/Odometry` child pose is the LiDAR frame `L`. The display keeps up to 4,096 positions per
 path at approximately 5 cm spacing; recording files are unchanged apart from the
 alignment metadata.
+The global display overlay accumulates 20 cm voxel centroids from
+`/cloud_registered`; it is separate from Faster-LIO's native registration map.
 
 # Performance benchmark files
 
