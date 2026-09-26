@@ -31,6 +31,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
     private CameraHandler mCameraHandler;
     private TextureMovieEncoder mVideoEncoder;
+    private final Runnable mRequestRender;
     private final ArCoreRecorder mArCoreRecorder;
     private String mOutputFile;
     private String mTimeFile;
@@ -41,6 +42,9 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
     private int mTextureId;
 
     private SurfaceTexture mSurfaceTexture;
+    private boolean mHasLatchedFrame;
+    private int mEncoderTextureId = -1;
+    private long mLastQueuedFrameTimestamp = Long.MIN_VALUE;
     private boolean mRecordingEnabled;
     private int mRecordingStatus;
     private int mFrameCount;
@@ -66,10 +70,12 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
      */
     public CameraSurfaceRenderer(CameraHandler cameraHandler,
                                  TextureMovieEncoder movieEncoder,
-                                 ArCoreRecorder arCoreRecorder) {
+                                 ArCoreRecorder arCoreRecorder,
+                                 Runnable requestRender) {
         mCameraHandler = cameraHandler;
         mVideoEncoder = movieEncoder;
         mArCoreRecorder = arCoreRecorder;
+        mRequestRender = requestRender;
         mTextureId = -1;
 
         mRecordingStatus = -1;
@@ -231,6 +237,9 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                 new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_EXT));
 
         mTextureId = mFullScreen.createTextureObject();
+        mHasLatchedFrame = false;
+        mEncoderTextureId = -1;
+        mLastQueuedFrameTimestamp = Long.MIN_VALUE;
         mArCoreRecorder.onGlSurfaceCreated();
 
         // Create a SurfaceTexture, with an external texture, in this EGL context.  We don't
@@ -256,8 +265,14 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
 
         // Latch the latest frame.  If there isn't anything new, we'll just re-use whatever
         // was there before.
-        mSurfaceTexture.updateTexImage();
-        if (mIncomingWidth > 0 && mIncomingHeight > 0) {
+        // The encoder reads this texture from another EGL context.  Do not replace its
+        // image until that draw has finished; the encoder will request another render.
+        boolean frameLatched = mVideoEncoder.canLatchNextFrame(mRequestRender);
+        if (frameLatched) {
+            mSurfaceTexture.updateTexImage();
+            mHasLatchedFrame = true;
+        }
+        if (frameLatched && mIncomingWidth > 0 && mIncomingHeight > 0) {
             mArCoreRecorder.onDrawFrame(mIncomingWidth, mIncomingHeight);
         }
 
@@ -284,11 +299,15 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                                             VideoEncoderCore.FRAME_RATE),
                                     EGL14.eglGetCurrentContext(),
                                     mTimeFile));
+                    mEncoderTextureId = -1;
+                    mLastQueuedFrameTimestamp = Long.MIN_VALUE;
                     mRecordingStatus = RECORDING_ON;
                     break;
                 case RECORDING_RESUMED:
                     Timber.d("RESUME recording");
                     mVideoEncoder.updateSharedContext(EGL14.eglGetCurrentContext());
+                    mEncoderTextureId = -1;
+                    mLastQueuedFrameTimestamp = Long.MIN_VALUE;
                     mRecordingStatus = RECORDING_ON;
                     break;
                 case RECORDING_ON:
@@ -304,6 +323,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                     // stop recording
                     Timber.d("STOP recording");
                     mVideoEncoder.stopRecording();
+                    mEncoderTextureId = -1;
                     mRecordingStatus = RECORDING_OFF;
                     break;
                 case RECORDING_OFF:
@@ -314,18 +334,19 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
             }
         }
 
-        // Set the video encoder's texture name.  We only need to do this once, but in the
-        // current implementation it has to happen after the video encoder is started, so
-        // we just do it here.
-        //
-        // TODO: be less lame.
-        mVideoEncoder.setTextureId(mTextureId);
+        if (mRecordingStatus == RECORDING_ON && frameLatched) {
+            if (mEncoderTextureId != mTextureId) {
+                mVideoEncoder.setTextureId(mTextureId);
+                mEncoderTextureId = mTextureId;
+            }
+            long timestamp = mSurfaceTexture.getTimestamp();
+            if (timestamp != mLastQueuedFrameTimestamp &&
+                    mVideoEncoder.frameAvailable(mSurfaceTexture)) {
+                mLastQueuedFrameTimestamp = timestamp;
+            }
+        }
 
-        // Tell the video encoder thread that a new frame is available.
-        // This will be ignored if we're not actually recording.
-        mVideoEncoder.frameAvailable(mSurfaceTexture);
-
-        if (mIncomingWidth <= 0 || mIncomingHeight <= 0) {
+        if (!mHasLatchedFrame || mIncomingWidth <= 0 || mIncomingHeight <= 0) {
             // Texture size isn't set yet.  This is only used for the filters, but to be
             // safe we can just skip drawing while we wait for the various races to resolve.
             // (This seems to happen if you toggle the screen off/on with power button.)

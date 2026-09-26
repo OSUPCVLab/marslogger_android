@@ -68,7 +68,7 @@ public class CameraCapture implements SurfaceTexture.OnFrameAvailableListener {
         mGLView = glView;
         if (mRenderer == null) {
             mRenderer = new CameraSurfaceRenderer(
-                    cameraHandler, sVideoEncoder, mArCoreRecorder);
+                    cameraHandler, sVideoEncoder, mArCoreRecorder, glView::requestRender);
             mGLView.setEGLContextClientVersion(2);     // select GLES 2.0
             mGLView.setRenderer(mRenderer);
             mGLView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);

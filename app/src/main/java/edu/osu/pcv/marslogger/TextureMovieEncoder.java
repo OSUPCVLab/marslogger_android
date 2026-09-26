@@ -80,12 +80,13 @@ public class TextureMovieEncoder implements Runnable {
     // ----- accessed by multiple threads -----
     private volatile EncoderHandler mHandler;
 
-    private Object mReadyFence = new Object();      // guards ready/running
+    private final Object mReadyFence = new Object(); // guards ready/running and frame handoff
     private boolean mReady;
     private boolean mRunning;
+    private boolean mFramePending;
+    private Runnable mRenderWhenReady;
     private Long mLastFrameTimeNs = null;
     public Float mFrameRate = 15.f;
-    private float[] STMatrix = new float[16];
 
     /**
      * Encoder configuration.
@@ -184,26 +185,29 @@ public class TextureMovieEncoder implements Runnable {
     }
 
     /**
-     * Tells the video recorder that a new frame is available.  (Call from non-encoder thread.)
-     * <p>
-     * This function sends a message and returns immediately.  This isn't sufficient -- we
-     * don't want the caller to latch a new frame until we're done with this one -- but we
-     * can get away with it so long as the input frame rate is reasonable and the encoder
-     * thread doesn't stall.
-     * <p>
-     * TODO: either block here until the texture has been rendered onto the encoder surface,
-     * or have a separate "block if still busy" method that the caller can execute immediately
-     * before it calls updateTexImage().  The latter is preferred because we don't want to
-     * stall the caller while this thread does work.
+     * Returns whether the preview may replace the shared texture with updateTexImage().
+     * If the encoder is still using it, request another draw when it becomes available.
      */
-    public void frameAvailable(SurfaceTexture st) {
+    public boolean canLatchNextFrame(Runnable requestRender) {
         synchronized (mReadyFence) {
-            if (!mReady) {
-                return;
+            if (mFramePending) {
+                mRenderWhenReady = requestRender;
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Queues the currently latched frame.  Only one frame may use the shared texture at a time.
+     * Returns false when the encoder is stopping or the camera timestamp is invalid.
+     */
+    public boolean frameAvailable(SurfaceTexture st) {
+        synchronized (mReadyFence) {
+            if (!mReady || !mRunning || mFramePending) {
+                return false;
             }
         }
-
-        st.getTransformMatrix(STMatrix);
         long timestamp = st.getTimestamp();
         if (timestamp == 0) {
             // Seeing this after device is toggled off/on with power button.  The
@@ -212,11 +216,24 @@ public class TextureMovieEncoder implements Runnable {
             // MPEG4Writer thinks this is cause to abort() in native code, so it's very
             // important that we just ignore the frame.
             Timber.w("HEY: got SurfaceTexture with timestamp of zero");
-            return;
+            return false;
         }
 
-        mHandler.sendMessage(mHandler.obtainMessage(MSG_FRAME_AVAILABLE,
-                (int) (timestamp >> 32), (int) timestamp, STMatrix));
+        // Each message owns its matrix; the preview may read another frame before this runs.
+        float[] transform = new float[16];
+        st.getTransformMatrix(transform);
+        synchronized (mReadyFence) {
+            if (!mReady || !mRunning || mFramePending) {
+                return false;
+            }
+            mFramePending = true;
+            if (!mHandler.sendMessage(mHandler.obtainMessage(MSG_FRAME_AVAILABLE,
+                    (int) (timestamp >> 32), (int) timestamp, transform))) {
+                mFramePending = false;
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -252,9 +269,17 @@ public class TextureMovieEncoder implements Runnable {
         Looper.loop();
 
         Timber.d("Encoder thread exiting");
+        Runnable requestRender;
         synchronized (mReadyFence) {
             mReady = mRunning = false;
             mHandler = null;
+            mFramePending = false;
+            requestRender = mRenderWhenReady;
+            mRenderWhenReady = null;
+            mReadyFence.notifyAll();
+        }
+        if (requestRender != null) {
+            requestRender.run();
         }
     }
 
@@ -328,21 +353,41 @@ public class TextureMovieEncoder implements Runnable {
      * @param timestampNanos The frame's timestamp, from SurfaceTexture.
      */
     private void handleFrameAvailable(float[] transform, long timestampNanos) {
-        if (VERBOSE) Timber.d("handleFrameAvailable tr=%f", transform);
-        mVideoEncoder.drainEncoder(false);
-        mFullScreen.drawFrame(mTextureId, transform);
+        try {
+            if (VERBOSE) Timber.d("handleFrameAvailable tr=%f", transform);
+            mVideoEncoder.drainEncoder(false);
+            mFullScreen.drawFrame(mTextureId, transform);
 
 //        drawBox(mFrameNum++);
 
-        mInputWindowSurface.setPresentationTime(timestampNanos);
-        mInputWindowSurface.swapBuffers();
+            mInputWindowSurface.setPresentationTime(timestampNanos);
+            mInputWindowSurface.swapBuffers();
+            // swapBuffers submits work, but the preview must not update this texture until
+            // the encoder's GPU sampling has completed in its separate EGL context.
+            GLES20.glFinish();
 
-        if (mLastFrameTimeNs != null) {
-            Long gapNs = timestampNanos - mLastFrameTimeNs;
-            mFrameRate = mFrameRate * 0.3f +
-                    (float) (1000000000.0 / gapNs * 0.7);
+            if (mLastFrameTimeNs != null) {
+                Long gapNs = timestampNanos - mLastFrameTimeNs;
+                mFrameRate = mFrameRate * 0.3f +
+                        (float) (1000000000.0 / gapNs * 0.7);
+            }
+            mLastFrameTimeNs = timestampNanos;
+        } finally {
+            frameFinished();
         }
-        mLastFrameTimeNs = timestampNanos;
+    }
+
+    private void frameFinished() {
+        Runnable requestRender;
+        synchronized (mReadyFence) {
+            mFramePending = false;
+            requestRender = mRenderWhenReady;
+            mRenderWhenReady = null;
+            mReadyFence.notifyAll();
+        }
+        if (requestRender != null) {
+            requestRender.run();
+        }
     }
 
     /**

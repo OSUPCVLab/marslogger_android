@@ -1443,10 +1443,10 @@ public class LidarCaptureActivity extends RosActivity implements OnItemSelectedL
                             frameId, sensorTimestampNs);
                 }
                 List<Point> points = PCConverter.toPointList(msg);
-                mPCGLView.appendRegisteredPoints(points);
                 if (timing != null) {
                     performanceLogger.onPreprocessingComplete(timing, points.size());
                 }
+                mPCGLView.appendRegisteredPoints(points);
                 mPCGLView.appendPoints(points);
                 if (timing != null) {
                     performanceLogger.onOpenGlHandoff(timing);
