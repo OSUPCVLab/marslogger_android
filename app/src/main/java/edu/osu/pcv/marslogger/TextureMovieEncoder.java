@@ -24,6 +24,8 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 
@@ -76,6 +78,10 @@ public class TextureMovieEncoder implements Runnable {
     private int mTextureId;
     private int mFrameNum;
     private VideoEncoderCore mVideoEncoder;
+    private BufferedWriter mTransformWriter;
+    private int mTransformRowsSinceFlush;
+    private int mEncoderWidth;
+    private int mEncoderHeight;
 
     // ----- accessed by multiple threads -----
     private volatile EncoderHandler mHandler;
@@ -105,15 +111,18 @@ public class TextureMovieEncoder implements Runnable {
         final int mBitRate;
         final EGLContext mEglContext;
         final String mTimeFile;
+        final String mTransformFile;
 
         public EncoderConfig(String outputFile, int width, int height, int bitRate,
-                             EGLContext sharedEglContext, String timeFile) {
+                             EGLContext sharedEglContext, String timeFile,
+                             String transformFile) {
             mOutputFile = outputFile;
             mWidth = width;
             mHeight = height;
             mBitRate = bitRate;
             mEglContext = sharedEglContext;
             mTimeFile = timeFile;
+            mTransformFile = transformFile;
         }
 
         @Override
@@ -340,6 +349,7 @@ public class TextureMovieEncoder implements Runnable {
         mFrameNum = 0;
         prepareEncoder(config.mEglContext, config.mWidth, config.mHeight, config.mBitRate,
                 config.mOutputFile, config.mTimeFile);
+        startTransformRecording(config.mTransformFile, config.mWidth, config.mHeight);
     }
 
     /**
@@ -362,6 +372,7 @@ public class TextureMovieEncoder implements Runnable {
 
             mInputWindowSurface.setPresentationTime(timestampNanos);
             mInputWindowSurface.swapBuffers();
+            recordTransform(timestampNanos, transform);
             // swapBuffers submits work, but the preview must not update this texture until
             // the encoder's GPU sampling has completed in its separate EGL context.
             GLES20.glFinish();
@@ -395,8 +406,12 @@ public class TextureMovieEncoder implements Runnable {
      */
     private void handleStopRecording() {
         Timber.d("handleStopRecording");
-        mVideoEncoder.drainEncoder(true);
-        releaseEncoder();
+        try {
+            mVideoEncoder.drainEncoder(true);
+            releaseEncoder();
+        } finally {
+            stopTransformRecording();
+        }
     }
 
     /**
@@ -446,6 +461,67 @@ public class TextureMovieEncoder implements Runnable {
 
         mFullScreen = new FullFrameRect(
                 new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_EXT));
+    }
+
+    private void startTransformRecording(String transformFile, int width, int height) {
+        stopTransformRecording();
+        mEncoderWidth = width;
+        mEncoderHeight = height;
+        mTransformRowsSinceFlush = 0;
+        if (transformFile == null) {
+            return;
+        }
+        try {
+            mTransformWriter = new BufferedWriter(new FileWriter(transformFile, false));
+            StringBuilder header = new StringBuilder(
+                    "camera_sensor_timestamp_ns,encoder_width,encoder_height");
+            for (int i = 0; i < 16; ++i) {
+                header.append(",texture_transform_").append(i);
+            }
+            mTransformWriter.write(header.toString());
+            mTransformWriter.newLine();
+            mTransformWriter.flush();
+        } catch (IOException error) {
+            Timber.e(error, "Could not initialize frame texture-transform file");
+            stopTransformRecording();
+        }
+    }
+
+    private void recordTransform(long timestampNanos, float[] transform) {
+        if (mTransformWriter == null) {
+            return;
+        }
+        try {
+            StringBuilder row = new StringBuilder();
+            row.append(timestampNanos)
+                    .append(',').append(mEncoderWidth)
+                    .append(',').append(mEncoderHeight);
+            for (float value : transform) {
+                row.append(',').append(value);
+            }
+            mTransformWriter.write(row.toString());
+            mTransformWriter.newLine();
+            if (++mTransformRowsSinceFlush >= VideoEncoderCore.FRAME_RATE) {
+                mTransformWriter.flush();
+                mTransformRowsSinceFlush = 0;
+            }
+        } catch (IOException error) {
+            Timber.e(error, "Could not write frame texture transform");
+            stopTransformRecording();
+        }
+    }
+
+    private void stopTransformRecording() {
+        if (mTransformWriter == null) {
+            return;
+        }
+        try {
+            mTransformWriter.flush();
+            mTransformWriter.close();
+        } catch (IOException error) {
+            Timber.e(error, "Could not close frame texture-transform file");
+        }
+        mTransformWriter = null;
     }
 
     private void releaseEncoder() {

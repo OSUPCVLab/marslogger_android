@@ -35,6 +35,7 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
     private final ArCoreRecorder mArCoreRecorder;
     private String mOutputFile;
     private String mTimeFile;
+    private String mTransformFile;
 
     private FullFrameRect mFullScreen;
 
@@ -91,9 +92,10 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
         mNewFilter = CameraCapture.FILTER_NONE;
     }
 
-    public void resetOutputFiles(String outputFile, String timeFile) {
+    public void resetOutputFiles(String outputFile, String timeFile, String transformFile) {
         mOutputFile = outputFile;
         mTimeFile = timeFile;
+        mTransformFile = transformFile;
     }
 
     /**
@@ -298,7 +300,8 @@ class CameraSurfaceRenderer implements GLSurfaceView.Renderer {
                                     CameraUtils.calcBitRate(mVideoFrameWidth, mVideoFrameHeight,
                                             VideoEncoderCore.FRAME_RATE),
                                     EGL14.eglGetCurrentContext(),
-                                    mTimeFile));
+                                    mTimeFile,
+                                    mTransformFile));
                     mEncoderTextureId = -1;
                     mLastQueuedFrameTimestamp = Long.MIN_VALUE;
                     mRecordingStatus = RECORDING_ON;

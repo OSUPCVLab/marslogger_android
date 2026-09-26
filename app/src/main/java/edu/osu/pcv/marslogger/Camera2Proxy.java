@@ -76,6 +76,12 @@ public class Camera2Proxy {
     private CameraCaptureSession mCaptureSession;
     private CaptureRequest.Builder mPreviewRequestBuilder;
     private Rect sensorArraySize;
+    private Rect mOutputActiveArraySize;
+    private Rect mPreCorrectionActiveArraySize;
+    private Size mPixelArraySize;
+    private Integer mSensorOrientation;
+    private Integer mLensFacing;
+    private String mSelectedPhysicalCameraId = "";
     private Integer mTimeSourceValue;
 
     private CaptureRequest mPreviewRequest;
@@ -190,7 +196,19 @@ public class Camera2Proxy {
             String header = "sensor_timestamp_monotonic[sec],fx[px],fy[px],Frame No.," +
                     "Exposure time[nanosec],Sensor frame duration[nanosec]," +
                     "Frame readout time[nanosec]," +
-                    "ISO,Focal length,Focus distance,AF mode, host unix time[sec]";
+                    "ISO,Focal length,Focus distance,AF mode, host unix time[sec]," +
+                    "Crop left[pixel],Crop top[pixel],Crop right[pixel],Crop bottom[pixel]," +
+                    "Active array left[pixel],Active array top[pixel]," +
+                    "Active array right[pixel],Active array bottom[pixel]," +
+                    "Pre-correction active array left[pixel]," +
+                    "Pre-correction active array top[pixel]," +
+                    "Pre-correction active array right[pixel]," +
+                    "Pre-correction active array bottom[pixel]," +
+                    "Pixel array width[pixel],Pixel array height[pixel]," +
+                    "Sensor orientation[deg],Lens facing,Device orientation[deg]," +
+                    "Logical camera ID,Physical camera ID," +
+                    "Camera output width[pixel],Camera output height[pixel]," +
+                    "Preview width[pixel],Preview height[pixel]";
 
             mFrameMetadataWriter.write(header + "\n");
             mRecordingMetadata = true;
@@ -340,6 +358,8 @@ public class Camera2Proxy {
 
             sensorArraySize = mCameraCharacteristics.get(
                     CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            setOutputCameraCharacteristics(mCameraCharacteristics);
+            mSelectedPhysicalCameraId = "";
             mTimeSourceValue = mCameraCharacteristics.get(
                     CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE);
 
@@ -618,13 +638,25 @@ public class Camera2Proxy {
                                 mBackgroundHandler), mBackgroundHandler);
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 List<OutputConfiguration> outputConfigs = new ArrayList<>();
+                mSelectedPhysicalCameraId = "";
+                if (mPhysicalCameraIds != null && !mPhysicalCameraIds.isEmpty()) {
+                    // Preserve the existing physical-camera selection and record which ID won.
+                    Object[] physicalIds = mPhysicalCameraIds.toArray();
+                    mSelectedPhysicalCameraId = (String) physicalIds[
+                            Math.min(1, physicalIds.length - 1)];
+                    try {
+                        setOutputCameraCharacteristics(mCameraManager.getCameraCharacteristics(
+                                mSelectedPhysicalCameraId));
+                    } catch (CameraAccessException error) {
+                        Timber.w(error, "Could not read selected physical-camera characteristics");
+                    }
+                }
                 for (Surface surface : surfaces) {
                     OutputConfiguration config = new OutputConfiguration(surface);
-                    if (!mPhysicalCameraIds.isEmpty()) {
+                    if (!mSelectedPhysicalCameraId.isEmpty()) {
                         // As a rule of thumb, we assume that normal camera at index 0, wide angle lens at index 1.
                         // TODO(jhuai): choose wide angles lens by checking the camera characteristics as in Basicbokeh.
-                        String physicalCameraId = (String) mPhysicalCameraIds.toArray()[1];
-                        config.setPhysicalCameraId(physicalCameraId);
+                        config.setPhysicalCameraId(mSelectedPhysicalCameraId);
                     }
                     outputConfigs.add(config);
                 }
@@ -757,31 +789,44 @@ public class Camera2Proxy {
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                        @NonNull CaptureRequest request,
                                        @NonNull TotalCaptureResult result) {
-            Long sensorTimestampNanos =
-                    result.get(CaptureResult.SENSOR_TIMESTAMP);
+            CaptureResult outputResult = result;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    && !mSelectedPhysicalCameraId.isEmpty()) {
+                CaptureResult physicalResult = result.getPhysicalCameraResults().get(
+                        mSelectedPhysicalCameraId);
+                if (physicalResult != null) {
+                    outputResult = physicalResult;
+                }
+            }
+
+            Long sensorTimestampNanos = captureValue(outputResult, result,
+                    CaptureResult.SENSOR_TIMESTAMP);
             long upTimeNanos = sensorTimestampNanos;
             long unixTimeNanos = TimeHelper.monotonicToUnixTime(sensorTimestampNanos);
             final long kSecToNano = 1000000000;
             process(result);
 
             Long number = result.getFrameNumber();
-            Long exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME);
+            Long exposureTimeNs = captureValue(outputResult, result,
+                    CaptureResult.SENSOR_EXPOSURE_TIME);
 
-            Long frmDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION);
-            Long frmReadoutNs = result.get(CaptureResult.SENSOR_ROLLING_SHUTTER_SKEW);
-            Integer iso = result.get(CaptureResult.SENSOR_SENSITIVITY);
+            Long frmDurationNs = captureValue(outputResult, result,
+                    CaptureResult.SENSOR_FRAME_DURATION);
+            Long frmReadoutNs = captureValue(outputResult, result,
+                    CaptureResult.SENSOR_ROLLING_SHUTTER_SKEW);
+            Integer iso = captureValue(outputResult, result, CaptureResult.SENSOR_SENSITIVITY);
             if (expoStats.size() > kMaxExpoSamples) {
                 expoStats.subList(0, kMaxExpoSamples / 2).clear();
             }
             expoStats.add(new NumExpoIso(number, exposureTimeNs, iso));
 
-            Float fl = result.get(CaptureResult.LENS_FOCAL_LENGTH);
+            Float fl = captureValue(outputResult, result, CaptureResult.LENS_FOCAL_LENGTH);
 
-            Float fd = result.get(CaptureResult.LENS_FOCUS_DISTANCE);
+            Float fd = captureValue(outputResult, result, CaptureResult.LENS_FOCUS_DISTANCE);
 
-            Integer afMode = result.get(CaptureResult.CONTROL_AF_MODE);
+            Integer afMode = captureValue(outputResult, result, CaptureResult.CONTROL_AF_MODE);
 
-            Rect rect = result.get(CaptureResult.SCALER_CROP_REGION);
+            Rect rect = captureValue(outputResult, result, CaptureResult.SCALER_CROP_REGION);
             mFocalLengthHelper.setmFocalLength(fl);
             mFocalLengthHelper.setmFocusDistance(fd);
             mFocalLengthHelper.setmCropRegion(rect);
@@ -800,6 +845,17 @@ public class Camera2Proxy {
             sb.append(delimiter + fd);
             sb.append(delimiter + afMode);
             sb.append(delimiter + String.format("%d.%09d", unixTimeNanos / kSecToNano, unixTimeNanos % kSecToNano));
+            appendRect(sb, rect);
+            appendRect(sb, mOutputActiveArraySize);
+            appendRect(sb, mPreCorrectionActiveArraySize);
+            appendSize(sb, mPixelArraySize);
+            sb.append(delimiter).append(valueOrEmpty(mSensorOrientation));
+            sb.append(delimiter).append(valueOrEmpty(mLensFacing));
+            sb.append(delimiter).append(mDeviceOrientation);
+            sb.append(delimiter).append(mCameraIdStr);
+            sb.append(delimiter).append(mSelectedPhysicalCameraId);
+            appendSize(sb, mVideoSize);
+            appendSize(sb, mPreviewSize);
             String frame_info = sb.toString();
             if (mRecordingMetadata) {
                 try {
@@ -813,6 +869,46 @@ public class Camera2Proxy {
         }
 
     };
+
+    private static void appendRect(StringBuilder sb, Rect rect) {
+        if (rect == null) {
+            sb.append(",,,,");
+            return;
+        }
+        sb.append(',').append(rect.left)
+                .append(',').append(rect.top)
+                .append(',').append(rect.right)
+                .append(',').append(rect.bottom);
+    }
+
+    private static void appendSize(StringBuilder sb, Size size) {
+        if (size == null) {
+            sb.append(",,");
+            return;
+        }
+        sb.append(',').append(size.getWidth()).append(',').append(size.getHeight());
+    }
+
+    private static String valueOrEmpty(Object value) {
+        return value == null ? "" : value.toString();
+    }
+
+    private static <T> T captureValue(CaptureResult preferred, CaptureResult fallback,
+            CaptureResult.Key<T> key) {
+        T value = preferred.get(key);
+        return value != null ? value : fallback.get(key);
+    }
+
+    private void setOutputCameraCharacteristics(CameraCharacteristics characteristics) {
+        mOutputActiveArraySize = characteristics.get(
+                CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+        mPreCorrectionActiveArraySize = characteristics.get(
+                CameraCharacteristics.SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE);
+        mPixelArraySize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE);
+        mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+        mLensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+        mFocalLengthHelper.setLensParams(characteristics);
+    }
 
 
     void changeManualFocusPoint(ManualFocusConfig focusConfig) {

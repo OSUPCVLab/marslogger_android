@@ -302,9 +302,11 @@ public class CameraCaptureActivity extends Activity
             }
             String outputFile = outputDir + File.separator + "movie.mp4";
             String metaFile = outputDir + File.separator + "frame_timestamps.txt";
+            String transformFile = outputDir + File.separator + "frame_texture_transforms.csv";
             String basename = outputDir.substring(outputDir.lastIndexOf("/")+1);
             mOutputDirText.setText(basename);
-            mCameraCapture.mRenderer.resetOutputFiles(outputFile, metaFile); // this will not cause sync issues
+            mCameraCapture.mRenderer.resetOutputFiles(
+                    outputFile, metaFile, transformFile); // this will not cause sync issues
             String inertialFile = outputDir + File.separator + "gyro_accel.csv";
             String gpsFile = outputDir + File.separator + "gps.csv";
             String allGpsFile = outputDir + File.separator + "all_gps.csv";

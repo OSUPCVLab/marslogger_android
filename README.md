@@ -36,6 +36,14 @@ consult `edge_epochs.txt` for the camera clock source when aligning with IMU dat
 `world_origin_id` changes if the activity pauses and ARCore creates a new world origin during the same recording. 
 Pose values are meaningful when `tracking_state` is `TRACKING`.
 
+For offline rolling-shutter reconstruction, `movie_metadata.csv` also records the selected
+logical/physical camera IDs, the physical camera's active and pre-correction array rectangles,
+pixel-array size, per-frame crop rectangle, sensor orientation, lens facing, device orientation,
+and camera/preview dimensions. `frame_texture_transforms.csv` records the 4x4
+`SurfaceTexture` transform actually used for every frame submitted to the encoder, keyed by the
+Camera2 sensor timestamp in nanoseconds, together with the encoded dimensions. Join it to
+`frame_timestamps.txt` by timestamp to restrict processing to frames present in `movie.mp4`.
+
 To check it on a device, record while moving the phone through a textured, well-lit area. 
 After stopping, confirm `arcore_poses.csv` has rows with increasing timestamps and `TRACKING` states, 
 and that the usual video, Camera2 metadata, and IMU files are still present.
