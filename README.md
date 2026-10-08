@@ -115,15 +115,20 @@ For building the `main` or `develop` branches of `marslogger`, refer to the [mar
 ## Bill of Materials
 
 - A battery with 12 V output
+- An inline power switch on the 12 V supply to the LiDAR
 - A Livox Mid360 LiDAR
 - A Mid360 connector with an RJ45 Ethernet connector and a barrel power connector
 - An Android smartphone running Android OS 11 or later
 - A USB Type-C to RJ45 Ethernet adapter
 - A 3D-printed [battery housing](doc/stl/mid360_holder.STL) and [lid](doc/stl/mid360_holder_lid.STL)
+- Two clamps that hold the smartphone rigidly against the housing
 
 ## Connection
 
-The following figure shows the sensor and power connections.
+The following figure shows the main sensor and power connections.
+The inline switch is on the 12 V battery-to-LiDAR lead; the simplified
+diagram does not depict it. Secure the phone with both clamps before
+recording so its pose relative to the LiDAR remains fixed.
 
 <p align="center">
   <img src="doc/pictures/connection.png" alt="Sensor and power connections" width="50%">
