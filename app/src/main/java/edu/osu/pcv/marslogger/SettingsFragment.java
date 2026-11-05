@@ -314,7 +314,14 @@ public class SettingsFragment extends PreferenceFragmentCompat
             sharedPreferences.edit().putString("prefMasterURI", NodeConfiguration.DEFAULT_MASTER_URI.toString()).apply();
 
         String currentHostIp = IPTool.getHostEthernetIp();
-        String ipnote = "";
+        String ipnote;
+        if (currentHostIp == null || currentHostIp.isEmpty()) {
+            ipnote = "Tablet/phone Ethernet IPv4 address: not available. " +
+                    "Connect the USB-C Ethernet adapter and ensure the Ethernet interface " +
+                    "has an IPv4 address, then reopen Settings.";
+        } else {
+            ipnote = "Tablet/phone Ethernet IPv4 address: " + currentHostIp;
+        }
         String extdir = getActivity().getExternalFilesDir(
                 Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
         File configFile = new File(extdir, "MID360_config.json");
@@ -331,8 +338,11 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 JSONObject lidarconfig = lidarconfigs.getJSONObject(0);
                 String lidarip = lidarconfig.getString("ip");
 //        ipnote += ". Previous host IP: " + hostip + ", lidar 0 IP: " + lidarip;
-                if (!hostip.equals(currentHostIp)) {
-                    ipnote += "Warning: The host address and lidar address are on different network segments, " +
+                if (currentHostIp == null || currentHostIp.isEmpty()) {
+                    ipnote += "\nPrevious LiDAR IP: " + lidarip +
+                            ". Connect Ethernet to check whether the IPs are consistent.";
+                } else if (!hostip.equals(currentHostIp)) {
+                    ipnote += "\nWarning: The host address and lidar address are on different network segments, " +
                             "the host_ip: " + currentHostIp + ", previous lidar_ip: " + lidarip;
                     ipnote += "\nTo fix this, open livox viewer2 in a laptop, connect to mid360 by " +
                             "setting the laptop ethernet static IP to: " + hostip;
@@ -345,17 +355,20 @@ public class SettingsFragment extends PreferenceFragmentCompat
                     ipnote += "\nAlso, set the points IP, IMU IP, and lidar info IP to " + currentHostIp;
                     ipnote += "\nDo not start recording in case of inconsistent IPs as recording will override the previous config.";
                 } else {
-                    ipnote = "The host IP and lidar IP look consistent, host_ip: " + currentHostIp + " lidar_ip: " + lidarip;
+                    ipnote += "\nThe host IP and lidar IP look consistent, host_ip: " + currentHostIp + " lidar_ip: " + lidarip;
                     ipnote += ". But this may be wrong if recording had been attempted in case of inconsistent IPs.";
                 }
             } catch (Exception e) {
-                ipnote += "Exception in loading previous IP from " + configFile.getAbsolutePath();
+                ipnote += "\nException in loading previous IP from " + configFile.getAbsolutePath();
                 e.printStackTrace();
             }
         } else {
-            ipnote += "No previous IP record found.";
+            ipnote += "\nNo previous IP record found.";
         }
-        sharedPreferences.edit().putString("prefIPNote", ipnote).apply();
+        Preference ipNotePreference = findPreference("prefIPNote");
+        if (ipNotePreference != null) {
+            ipNotePreference.setSummary(ipnote);
+        }
         if (lidarid.length() > 0)
             sharedPreferences.edit().putString("prefLidarId", lidarid).apply();
 

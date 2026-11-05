@@ -97,8 +97,8 @@
 
         <EditTextPreference
             android:key="prefLidarId"
-            android:title="Lidar Id"
-            android:summary="Last 3 digits of the mid360 serial number"
+            android:title="LiDAR ID (IP last octet)"
+            android:summary="1xx, where xx is the last two digits of the MID-360 serial number"
             android:defaultValue="157" />
 
         <EditTextPreference
@@ -107,11 +107,10 @@
             android:summary="Pandar timestamp_type realtime or (empty) sensor time"
             android:defaultValue="" />
 
-        <EditTextPreference
+        <Preference
             android:key="prefIPNote"
             android:title="Note on IP"
-            android:summary="Note about IP settings"
-            android:defaultValue="A note on lidar IP addresses" />
+            android:summary="Connect a USB-C Ethernet adapter to show the tablet/phone Ethernet IPv4 address" />
 
     </PreferenceCategory>
 
