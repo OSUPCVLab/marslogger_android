@@ -313,22 +313,29 @@ public class SettingsFragment extends PreferenceFragmentCompat
         if (prevMasterURI.length() == 0)
             sharedPreferences.edit().putString("prefMasterURI", NodeConfiguration.DEFAULT_MASTER_URI.toString()).apply();
 
+        updateIpNote(sharedPreferences);
+    }
+
+    private void updateIpNote(SharedPreferences sharedPreferences) {
         String currentHostIp = IPTool.getHostEthernetIp();
+        String lidarid = sharedPreferences.getString("prefLidarId", "157");
+        String targetLidarIp = null;
         String ipnote;
         if (currentHostIp == null || currentHostIp.isEmpty()) {
-            ipnote = "Tablet/phone Ethernet IPv4 address: not available. " +
-                    "Connect the USB-C Ethernet adapter and ensure the Ethernet interface " +
-                    "has an IPv4 address, then reopen Settings.";
+            ipnote = "Phone/tablet Ethernet IPv4 address: unavailable. " +
+                    "Connect the USB-C Ethernet adapter and configure Ethernet in the " +
+                    "device's system settings, then reopen Settings.";
+            ipnote += "\nSelected LiDAR ID (IP last octet): " + lidarid;
         } else {
-            ipnote = "Tablet/phone Ethernet IPv4 address: " + currentHostIp;
+            targetLidarIp = IPTool.composeLidarIp(currentHostIp, lidarid);
+            ipnote = "Phone/tablet Ethernet IPv4 address: " + currentHostIp;
+            ipnote += "\nTarget LiDAR IP (from LiDAR ID setting): " + targetLidarIp;
         }
         String extdir = getActivity().getExternalFilesDir(
                 Environment.getDataDirectory().getAbsolutePath()).getAbsolutePath();
         File configFile = new File(extdir, "MID360_config.json");
-        String lidarid = "";
         if (configFile.exists()) {
-            try {
-                InputStream is = new FileInputStream(configFile);
+            try (InputStream is = new FileInputStream(configFile)) {
                 String jsonTxt = IOUtils.toString(is);
                 JSONObject json = new JSONObject(jsonTxt);
                 JSONObject mid360 = json.getJSONObject("MID360");
@@ -337,41 +344,41 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 JSONArray lidarconfigs = json.getJSONArray("lidar_configs");
                 JSONObject lidarconfig = lidarconfigs.getJSONObject(0);
                 String lidarip = lidarconfig.getString("ip");
-//        ipnote += ". Previous host IP: " + hostip + ", lidar 0 IP: " + lidarip;
+                ipnote += "\n\nSaved MID-360 configuration:" +
+                        "\nSaved host IP: " + hostip + "\nSaved LiDAR IP: " + lidarip;
                 if (currentHostIp == null || currentHostIp.isEmpty()) {
-                    ipnote += "\nPrevious LiDAR IP: " + lidarip +
-                            ". Connect Ethernet to check whether the IPs are consistent.";
-                } else if (!hostip.equals(currentHostIp)) {
-                    ipnote += "\nWarning: The host address and lidar address are on different network segments, " +
-                            "the host_ip: " + currentHostIp + ", previous lidar_ip: " + lidarip;
-                    ipnote += "\nTo fix this, open livox viewer2 in a laptop, connect to mid360 by " +
-                            "setting the laptop ethernet static IP to: " + hostip;
+                    ipnote += "\nConnect Ethernet to determine the target LiDAR IP and compare it with the saved configuration.";
+                } else if (!hostip.equals(currentHostIp) || !lidarip.equals(targetLidarIp)) {
+                    ipnote += "\nThe current Ethernet IP or target LiDAR IP differs from the saved configuration. " +
+                            "If the MID-360 still uses the saved settings, update it in Livox Viewer 2:";
 
-                    String[] hostparts = currentHostIp.split("[.]");
-                    String subnet = hostparts[2];
-                    String[] lidarparts = lidarip.split("[.]");
-                    lidarid = lidarparts[3];
-                    ipnote += "\nThen in livox viewer2 settings, set the lidar IP to 192.168." + subnet + "." + lidarid;
-                    ipnote += "\nAlso, set the points IP, IMU IP, and lidar info IP to " + currentHostIp;
-                    ipnote += "\nDo not start recording in case of inconsistent IPs as recording will override the previous config.";
+                    ipnote += "\n1. Connect the MID-360 to a laptop. Give the laptop an unused static "
+                            + "IPv4 address in the same subnet as the LiDAR's current IP "
+                            + "(saved LiDAR IP: " + lidarip + ")."
+                            + "\n2. In Livox Viewer 2, set LiDAR IP (the sensor's own address) to "
+                            + targetLidarIp
+                            + "\nand set Points IP, IMU IP, and LiDAR Info IP "
+                            + "to the phone/tablet's Ethernet IP: " + currentHostIp + "."
+                            + "\n3. Apply the settings, reconnect the MID-360 to the phone/tablet, "
+                            + "and open the LiDAR preview.";
                 } else {
-                    ipnote += "\nThe host IP and lidar IP look consistent, host_ip: " + currentHostIp + " lidar_ip: " + lidarip;
-                    ipnote += ". But this may be wrong if recording had been attempted in case of inconsistent IPs.";
+                    ipnote += "\nThe current Ethernet IP and target LiDAR IP match the saved configuration.";
                 }
+                ipnote += "\n\nThe saved configuration does not verify the LiDAR's current network settings. " +
+                        "Confirm that live point clouds appear in the LiDAR preview before recording.";
             } catch (Exception e) {
-                ipnote += "\nException in loading previous IP from " + configFile.getAbsolutePath();
+                ipnote += "\nCould not read the saved MID-360 network configuration.";
                 e.printStackTrace();
             }
         } else {
-            ipnote += "\nNo previous IP record found.";
+            ipnote += "\nNo saved MID-360 network configuration was found. " +
+                    "Configure the MID-360 for the phone/tablet's Ethernet network in Livox Viewer 2, " +
+                    "then confirm that live point clouds appear in the LiDAR preview before recording.";
         }
         Preference ipNotePreference = findPreference("prefIPNote");
         if (ipNotePreference != null) {
             ipNotePreference.setSummary(ipnote);
         }
-        if (lidarid.length() > 0)
-            sharedPreferences.edit().putString("prefLidarId", lidarid).apply();
-
     }
 
     private void showExportSessions() {
@@ -598,6 +605,8 @@ public class SettingsFragment extends PreferenceFragmentCompat
         } else if (key.equals("prefNetworkInterface")) {
             final String face = sharedPreferences.getString("prefNetworkInterface", "");
             Timber.d("Using " + face + " interface.");
+        } else if (key.equals("prefLidarId")) {
+            updateIpNote(sharedPreferences);
         }
     }
 

@@ -107,7 +107,7 @@
             android:summary="Pandar timestamp_type realtime or (empty) sensor time"
             android:defaultValue="" />
 
-        <Preference
+        <edu.osu.pcv.marslogger.MultilineSummaryPreference
             android:key="prefIPNote"
             android:title="Note on IP"
             android:summary="Connect a USB-C Ethernet adapter to show the tablet/phone Ethernet IPv4 address" />
